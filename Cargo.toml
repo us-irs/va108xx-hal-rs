@@ -22,3 +22,12 @@ version = "0.1"
 
 [features]
 rt = ["va108xx/rt"]
+
+[profile.dev]
+debug = true
+lto = true
+
+[profile.release]
+lto = true
+debug = true
+opt-level = "s"
