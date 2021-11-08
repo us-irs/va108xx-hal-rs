@@ -24,6 +24,11 @@ version = "0.1"
 [features]
 rt = ["va108xx/rt"]
 
+[dev-dependencies]
+panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
+rtt-target = { version = "0.3", features = ["cortex-m"] }
+panic-halt = "0.2"
+
 [profile.dev]
 debug = true
 lto = false
@@ -32,3 +37,7 @@ lto = false
 lto = true
 debug = true
 opt-level = "s"
+
+[[example]]
+name = "timer-ticks"
+required-features = ["rt"]
