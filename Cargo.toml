@@ -4,16 +4,15 @@ version = "0.1.0"
 authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
 edition = "2018"
 description = "HAL for the Vorago VA108xx family of microcontrollers"
-homepage = "https://github.com/robamu/va108xx-hal-rs"
-repository = "https://github.com/robamu/va108xx-hal-rs"
+homepage = "https://github.com/robamu-org/va108xx-hal-rs"
+repository = "https://github.com/robamu-org/va108xx-hal-rs"
 license = "MIT OR Apache-2.0"
 keywords = ["no-std", "hal", "cortex-m", "vorago", "va108xx"]
 categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]
-
-cortex-m = "0.7.3"
-cortex-m-rt = "0.7.0"
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
 nb = "1"
 embedded-hal = { features = ["unproven"], version = "0.2.6" }
 
@@ -25,7 +24,7 @@ rt = ["va108xx/rt"]
 
 [profile.dev]
 debug = true
-lto = true
+lto = false
 
 [profile.release]
 lto = true
