@@ -15,12 +15,19 @@ cortex-m = "0.7"
 cortex-m-rt = "0.7"
 nb = "1"
 embedded-hal = { features = ["unproven"], version = "0.2.6" }
+void = { version = "1.0", default-features = false }
+once_cell = { version = "1.8.0", default-features = false }
 
 [dependencies.va108xx]
 version = "0.1"
 
 [features]
 rt = ["va108xx/rt"]
+
+[dev-dependencies]
+panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
+rtt-target = { version = "0.3", features = ["cortex-m"] }
+panic-halt = "0.2"
 
 [profile.dev]
 debug = true
@@ -30,3 +37,7 @@ lto = false
 lto = true
 debug = true
 opt-level = "s"
+
+[[example]]
+name = "timer-ticks"
+required-features = ["rt"]

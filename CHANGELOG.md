@@ -8,4 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
-- First version of the HAL which adds the GPIO implementation
+## [0.1.0]
+
+- First version of the HAL which adds the GPIO implementation and timer implementation.
+- Also adds some examples and helper files to set up new binary crates
