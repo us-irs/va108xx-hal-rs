@@ -1,8 +1,33 @@
 [package]
 name = "va108xx-hal"
 version = "0.1.0"
+authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "HAL for the Vorago VA108xx family of microcontrollers"
+homepage = "https://github.com/robamu/va108xx-hal-rs"
+repository = "https://github.com/robamu/va108xx-hal-rs"
+license = "MIT OR Apache-2.0"
+keywords = ["no-std", "hal", "cortex-m", "vorago", "va108xx"]
+categories = ["embedded", "no-std", "hardware-support"]
 
 [dependencies]
+
+cortex-m = "0.7.3"
+cortex-m-rt = "0.7.0"
+nb = "1"
+embedded-hal = { features = ["unproven"], version = "0.2.6" }
+
+[dependencies.va108xx]
+version = "0.1"
+
+[features]
+rt = ["va108xx/rt"]
+
+[profile.dev]
+debug = true
+lto = true
+
+[profile.release]
+lto = true
+debug = true
+opt-level = "s"
