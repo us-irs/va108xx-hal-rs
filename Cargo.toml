@@ -15,6 +15,8 @@ cortex-m = "0.7"
 cortex-m-rt = "0.7"
 nb = "1"
 embedded-hal = { features = ["unproven"], version = "0.2.6" }
+void = { version = "1.0", default-features = false }
+once_cell = { version = "1.8.0", default-features = false }
 
 [dependencies.va108xx]
 version = "0.1"
