@@ -15,3 +15,4 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - First version of the HAL which adds the GPIO implementation and timer implementation.
 - Also adds some examples and helper files to set up new binary crates
 - RTT example application
+- Added basic test binary in form of an example
