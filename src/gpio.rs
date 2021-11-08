@@ -1,7 +1,7 @@
 use crate::pac::SYSCONFIG;
-use cortex_m::singleton;
 use core::convert::Infallible;
 use core::marker::PhantomData;
+use cortex_m::singleton;
 use embedded_hal::digital::v2::{InputPin, OutputPin, StatefulOutputPin, ToggleableOutputPin};
 use va108xx::IOCONFIG;
 
@@ -28,7 +28,7 @@ pub enum PinState {
 
 enum PortId {
     A,
-    B
+    B,
 }
 
 trait GpioRegExt {
