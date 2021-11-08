@@ -16,3 +16,4 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Also adds some examples and helper files to set up new binary crates
 - RTT example application
 - Added basic test binary in form of an example
+- README with basic instructions how to set up own binary crate
