@@ -1,3 +1,8 @@
+//! API for the GPIO pins
+//!
+//! ## Examples
+//!
+//! - [Blinky example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/blinky.rs)
 use crate::pac::SYSCONFIG;
 use core::convert::Infallible;
 use core::marker::PhantomData;
@@ -71,7 +76,7 @@ pub struct FUNSEL2;
 pub struct FUNSEL3;
 
 /// Function select (type state)
-pub struct Funsel<FUN> {
+pub struct AltFunc<FUN> {
     _mode: PhantomData<FUN>,
 }
 
@@ -207,7 +212,7 @@ macro_rules! gpio {
             use core::marker::PhantomData;
             use core::convert::Infallible;
             use super::{
-                FUNSEL1, FUNSEL2, FUNSEL3, Floating, Funsel, GpioExt, Input, OpenDrain,
+                FUNSEL1, FUNSEL2, FUNSEL3, Floating, AltFunc, GpioExt, Input, OpenDrain,
                 PullUp, Output, FilterType, FilterClkSel, Pin, GpioRegExt, PushPull,
                 PinModeError, PinState, PortId, singleton
             };
@@ -247,11 +252,9 @@ macro_rules! gpio {
             }
 
             fn _set_alternate_mode(iocfg: &mut IOCONFIG, index: usize, mode: u8) {
-                unsafe {
-                    iocfg.$portx[index].modify(|_, w| {
-                        w.funsel().bits(mode)
-                    })
-                }
+                iocfg.$portx[index].modify(|_, w| unsafe {
+                    w.funsel().bits(mode)
+                });
             }
 
             $(
@@ -260,15 +263,15 @@ macro_rules! gpio {
                 }
 
                 impl<MODE> $PXi<MODE> {
-                    pub fn into_funsel_1(self, iocfg: &mut IOCONFIG) -> $PXi<Funsel<FUNSEL1>> {
+                    pub fn into_funsel_1(self, iocfg: &mut IOCONFIG) -> $PXi<AltFunc<FUNSEL1>> {
                         _set_alternate_mode(iocfg, $i, 1);
                         $PXi { _mode: PhantomData }
                     }
-                    pub fn into_funsel_2(self, iocfg: &mut IOCONFIG) -> $PXi<Funsel<FUNSEL2>> {
+                    pub fn into_funsel_2(self, iocfg: &mut IOCONFIG) -> $PXi<AltFunc<FUNSEL2>> {
                         _set_alternate_mode(iocfg, $i, 2);
                         $PXi { _mode: PhantomData }
                     }
-                    pub fn into_funsel_3(self, iocfg: &mut IOCONFIG) -> $PXi<Funsel<FUNSEL3>> {
+                    pub fn into_funsel_3(self, iocfg: &mut IOCONFIG) -> $PXi<AltFunc<FUNSEL3>> {
                         _set_alternate_mode(iocfg, $i, 3);
                         $PXi { _mode: PhantomData }
                     }
@@ -312,7 +315,7 @@ macro_rules! gpio {
                         $PXi { _mode: PhantomData }
                     }
 
-                    pub fn into_pull_up_input(self, iocfg: &mut IOCONFIG) -> $PXi<Input<PullUp>> {
+                    pub fn into_pull_up_input(self, iocfg: &mut IOCONFIG, port: &mut $PORTX) -> $PXi<Input<PullUp>> {
                         unsafe {
                             iocfg.$portx[$i].modify(|_, w| {
                                 w.funsel().bits(0);
@@ -320,14 +323,13 @@ macro_rules! gpio {
                                 w.plevel().set_bit();
                                 w.opendrn().clear_bit()
                             });
-                            let port_reg = &(*$PORTX::ptr());
-                            port_reg.dir().modify(|r,w| w.bits(r.bits() & !(1 << $i)));
+                            port.dir().modify(|r,w| w.bits(r.bits() & !(1 << $i)));
                         }
                         $PXi { _mode: PhantomData }
                     }
 
                     pub fn into_pull_down_input(
-                        self, iocfg: &mut IOCONFIG, port_reg: &mut $PORTX
+                        self, iocfg: &mut IOCONFIG, port: &mut $PORTX
                     ) -> $PXi<Input<PullUp>> {
                         unsafe {
                             iocfg.$portx[$i].modify(|_, w| {
@@ -336,7 +338,7 @@ macro_rules! gpio {
                                 w.plevel().clear_bit();
                                 w.opendrn().clear_bit()
                             });
-                            port_reg.dir().modify(|r,w| w.bits(r.bits() & !(1 << $i)));
+                            port.dir().modify(|r,w| w.bits(r.bits() & !(1 << $i)));
                         }
                         $PXi { _mode: PhantomData }
                     }

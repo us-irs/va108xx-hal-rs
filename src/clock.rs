@@ -5,13 +5,14 @@ use va108xx::SYSCONFIG;
 
 static SYS_CLOCK: Mutex<OnceCell<Hertz>> = Mutex::new(OnceCell::new());
 
+#[derive(Copy, Clone, PartialEq)]
 pub enum PeripheralClocks {
     PortA = 0,
     PortB = 1,
     Spi0 = 4,
     Spi1 = 5,
     Spi2 = 6,
-    UArt0 = 8,
+    Uart0 = 8,
     Uart1 = 9,
     I2c0 = 16,
     I2c1 = 17,
