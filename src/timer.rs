@@ -1,3 +1,8 @@
+//! API for the TIM peripherals
+//!
+//! ## Examples
+//!
+//! - [MS and second tick implementation](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/timer-ticks.rs)
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
     time::Hertz,

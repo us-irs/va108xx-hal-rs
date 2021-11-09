@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+
+## [0.2.0]
+
+### Added
+
+- UART implementation
+- UART example
+- Some bugfixes for GPIO implementation
+- Rust edition updated to 2021
+
 ## [0.1.0]
 
 ### Added
