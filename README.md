@@ -21,9 +21,9 @@ is no need to pass the chip variant as a feature.
  [REB1 development board](https://www.voragotech.com/products/reb1-va108x0-development-board-0).
  The BSP provided for this board also contains instructions how to flash the board.
 
- | Crate | Version | Board Support Packages |
-|:------|:--------|:-----------------------|
-[WIP: vorago-reb1](https://github.com/robamu/vorago-reb1-rs) | 0.0.0 |  |
+ | Crate | Version |
+|:------|:--------|
+[vorago-reb1](https://crates.io/crates/vorago-reb1) | [![Crates.io](https://img.shields.io/crates/v/vorago-reb1)](https://crates.io/crates/vorago-reb1) |
 
 ## Building
 
