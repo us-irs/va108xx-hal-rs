@@ -2,7 +2,7 @@
 name = "va108xx-hal"
 version = "0.1.0"
 authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "HAL for the Vorago VA108xx family of microcontrollers"
 homepage = "https://github.com/robamu-org/va108xx-hal-rs"
 repository = "https://github.com/robamu-org/va108xx-hal-rs"
@@ -17,6 +17,7 @@ nb = "1"
 embedded-hal = { features = ["unproven"], version = "0.2.6" }
 void = { version = "1.0", default-features = false }
 once_cell = { version = "1.8.0", default-features = false }
+libm = "0.2.1"
 
 [dependencies.va108xx]
 version = "0.1"

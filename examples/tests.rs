@@ -72,7 +72,9 @@ fn main() -> ! {
         }
         TestCase::TestPullup => {
             // Tie PORTA[0] to PORTA[1] for these tests!
-            let input = porta.pa1.into_pull_up_input(&mut dp.IOCONFIG);
+            let input = porta
+                .pa1
+                .into_pull_up_input(&mut dp.IOCONFIG, &mut dp.PORTA);
             assert!(input.is_high().unwrap());
             let mut out = porta
                 .pa0
