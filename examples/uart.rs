@@ -7,18 +7,18 @@ use core::fmt::Write;
 use cortex_m_rt::entry;
 use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
-use va108xx_hal::{pac, prelude::*, uart};
+use va108xx_hal::{gpio::PinsB, pac, prelude::*, uart};
 
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
-    rprintln!("-- VA108xx UART test application--");
+    rprintln!("-- VA108xx UART example application--");
 
     let mut dp = pac::Peripherals::take().unwrap();
 
-    let gpiob = dp.PORTB.split(&mut dp.SYSCONFIG).unwrap();
-    let tx = gpiob.pb21.into_funsel_1(&mut dp.IOCONFIG);
-    let rx = gpiob.pb20.into_funsel_1(&mut dp.IOCONFIG);
+    let gpiob = PinsB::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTB);
+    let tx = gpiob.pb21.into_funsel_1();
+    let rx = gpiob.pb20.into_funsel_1();
 
     let uartb = uart::Uart::uartb(
         dp.UARTB,

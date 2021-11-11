@@ -6,11 +6,10 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::{InputPin, OutputPin, StatefulOutputPin, ToggleableOutputPin};
+use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
 use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
-use va108xx_hal::gpio::{porta, portb, PinState};
-use va108xx_hal::prelude::*;
+use va108xx_hal::gpio::{PinState, PinsA, PinsB};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -20,6 +19,8 @@ enum TestCase {
     TestPullup,
     TestPulldown,
     TestMask,
+    // Tie PORTB[22] to PORTB[23] for this test
+    PortB,
     Perid,
     // Tie PA0 to an oscilloscope and configure pulse detection
     Pulse,
@@ -32,11 +33,9 @@ fn main() -> ! {
     rtt_init_print!();
     rprintln!("-- VA108xx Test Application --");
     let mut dp = va108xx::Peripherals::take().unwrap();
-    let porta = dp.PORTA.split(&mut dp.SYSCONFIG).unwrap();
-    let _portb = dp.PORTB.split(&mut dp.SYSCONFIG).unwrap();
-    let mut led1 = porta
-        .pa10
-        .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
+    let pinsa = PinsA::new(&mut dp.SYSCONFIG, None, dp.PORTA);
+    let pinsb = PinsB::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTB);
+    let mut led1 = pinsa.pa10.into_push_pull_output();
     let test_case = TestCase::Delay;
 
     match test_case {
@@ -56,82 +55,70 @@ fn main() -> ! {
     match test_case {
         TestCase::TestBasic => {
             // Tie PORTA[0] to PORTA[1] for these tests!
-            let mut out = porta
-                .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .enable_input(&mut dp.IOCONFIG, true);
-            let input = porta
-                .pa1
-                .into_floating_input(&mut dp.IOCONFIG, &mut dp.PORTA);
+            let mut out = pinsa.pa0.into_readable_push_pull_output();
+            let input = pinsa.pa1.into_floating_input();
             out.set_high().unwrap();
-            assert!(out.is_set_high().unwrap());
             assert!(input.is_high().unwrap());
             out.set_low().unwrap();
-            assert!(out.is_set_low().unwrap());
             assert!(input.is_low().unwrap());
         }
         TestCase::TestPullup => {
             // Tie PORTA[0] to PORTA[1] for these tests!
-            let input = porta
-                .pa1
-                .into_pull_up_input(&mut dp.IOCONFIG, &mut dp.PORTA);
+            let input = pinsa.pa1.into_pull_up_input();
             assert!(input.is_high().unwrap());
-            let mut out = porta
-                .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
+            let mut out = pinsa.pa0.into_readable_push_pull_output();
             out.set_low().unwrap();
             assert!(input.is_low().unwrap());
             out.set_high().unwrap();
             assert!(input.is_high().unwrap());
-            out.into_floating_input(&mut dp.IOCONFIG, &mut dp.PORTA);
+            out.into_floating_input();
             assert!(input.is_high().unwrap());
         }
         TestCase::TestPulldown => {
             // Tie PORTA[0] to PORTA[1] for these tests!
-            let input = porta
-                .pa1
-                .into_pull_down_input(&mut dp.IOCONFIG, &mut dp.PORTA);
+            let input = pinsa.pa1.into_pull_down_input();
             assert!(input.is_low().unwrap());
-            let mut out = porta
-                .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
+            let mut out = pinsa.pa0.into_push_pull_output();
             out.set_low().unwrap();
             assert!(input.is_low().unwrap());
             out.set_high().unwrap();
             assert!(input.is_high().unwrap());
-            out.into_floating_input(&mut dp.IOCONFIG, &mut dp.PORTA);
+            out.into_floating_input();
             assert!(input.is_low().unwrap());
         }
         TestCase::TestMask => {
             // Tie PORTA[0] to PORTA[1] for these tests!
-            let input = porta
-                .pa1
-                .into_pull_down_input(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .clear_datamask(&mut dp.PORTA);
-            assert!(!input.datamask(&dp.PORTA));
-            let out = porta
-                .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .clear_datamask(&mut dp.PORTA);
-            assert!(input.is_low_masked(&mut dp.PORTA).is_err());
-            assert!(out.set_high_masked(&mut dp.PORTA).is_err());
+            let input = pinsa.pa1.into_pull_down_input().clear_datamask();
+            assert!(!input.datamask());
+            let mut out = pinsa.pa0.into_push_pull_output().clear_datamask();
+            assert!(input.is_low_masked().is_err());
+            assert!(out.set_high_masked().is_err());
+        }
+        TestCase::PortB => {
+            // Tie PORTB[22] to PORTB[23] for these tests!
+            let mut out = pinsb.pb22.into_readable_push_pull_output();
+            let input = pinsb.pb23.into_floating_input();
+            out.set_high().unwrap();
+            assert!(input.is_high().unwrap());
+            out.set_low().unwrap();
+            assert!(input.is_low().unwrap());
         }
         TestCase::Perid => {
-            assert_eq!(porta::get_perid(&dp.PORTA), 0x004007e1);
-            assert_eq!(portb::get_perid(&dp.PORTB), 0x004007e1);
+            assert_eq!(PinsA::get_perid(), 0x004007e1);
+            assert_eq!(PinsB::get_perid(), 0x004007e1);
         }
         TestCase::Pulse => {
-            let mut output_pulsed = porta
+            let mut output_pulsed = pinsa
                 .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .pulse_mode(&mut dp.PORTA, true, PinState::Low);
+                .into_push_pull_output()
+                .pulse_mode(true, PinState::Low);
             rprintln!("Pulsing high 10 times..");
             output_pulsed.set_low().unwrap();
             for _ in 0..10 {
                 output_pulsed.set_high().unwrap();
                 cortex_m::asm::delay(25_000_000);
             }
-            let mut output_pulsed = output_pulsed.pulse_mode(&mut dp.PORTA, true, PinState::High);
+            let mut output_pulsed = output_pulsed.pulse_mode(true, PinState::High);
             rprintln!("Pulsing low 10 times..");
             for _ in 0..10 {
                 output_pulsed.set_low().unwrap();
@@ -139,18 +126,9 @@ fn main() -> ! {
             }
         }
         TestCase::Delay => {
-            let mut out_0 = porta
-                .pa0
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .delay(&mut dp.PORTA, true, false);
-            let mut out_1 = porta
-                .pa1
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .delay(&mut dp.PORTA, false, true);
-            let mut out_2 = porta
-                .pa3
-                .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA)
-                .delay(&mut dp.PORTA, true, true);
+            let mut out_0 = pinsa.pa0.into_push_pull_output().delay(true, false);
+            let mut out_1 = pinsa.pa1.into_push_pull_output().delay(false, true);
+            let mut out_2 = pinsa.pa3.into_push_pull_output().delay(true, true);
             for _ in 0..20 {
                 out_0.toggle().unwrap();
                 out_1.toggle().unwrap();
