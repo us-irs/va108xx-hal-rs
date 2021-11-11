@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+### Changed
+
+- Minor optimizations and tweaks for GPIO module
 
 ## [0.2.0]
 

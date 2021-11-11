@@ -1,3 +1,6 @@
+//! # API for clock related functionality
+//!
+//! This also includes functionality to enable the peripheral clocks
 use crate::time::Hertz;
 use cortex_m::interrupt::{self, Mutex};
 use once_cell::unsync::OnceCell;

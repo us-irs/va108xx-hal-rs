@@ -84,15 +84,8 @@
 //! This module also provides additional, type-level tools to work with GPIO
 //! pins.
 //!
-//! The [`OptionalPinId`] and [`OptionalPin`] traits use the [`OptionalKind`]
-//! pattern to act as type-level versions of [`Option`] for `PinId` and `Pin`
-//! respectively. And the [`AnyPin`] trait defines an [`AnyKind`] type class
+//! The [`AnyPin`] trait defines an [`AnyKind`] type class
 //! for all `Pin` types.
-//!
-//! [type classes]: crate::typelevel#type-classes
-//! [type-level enum]: crate::typelevel#type-level-enum
-//! [`OptionalKind`]: crate::typelevel#optionalkind-trait-pattern
-//! [`AnyKind`]: crate::typelevel#anykind-trait-pattern
 
 use super::dynpins::{DynAlternate, DynGroup, DynInput, DynOutput, DynPinId, DynPinMode};
 use super::reg::RegisterInterface;
@@ -115,14 +108,12 @@ pub enum PinState {
 }
 
 /// GPIO error type
-///
-/// [`DynPin`]s are not tracked and verified at compile-time, so run-time
-/// operations are fallible. This `enum` represents the corresponding errors.
 #[derive(Debug, PartialEq)]
 pub enum PinError {
-    /// The pin did not have the correct ID or mode for the requested operation
+    /// The pin did not have the correct ID or mode for the requested operation.
+    /// [`DynPin`](crate::gpio::DynPin)s are not tracked and verified at compile-time, so run-time
+    /// operations are fallible.
     InvalidPinType,
-    InputDisabledForOutput,
     IsMasked,
 }
 
