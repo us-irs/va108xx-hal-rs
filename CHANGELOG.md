@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [0.2.0]
 
+### Changed
+
+- New GPIO implementation which uses type-level programming. Implementation heavily based on the
+  ATSAMD GPIO HAL: https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/gpio/v2/index.html
+- Changes to API, therefore minor version bump
+
 ### Added
 
 - UART implementation

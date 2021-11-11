@@ -9,21 +9,15 @@
 use cortex_m_rt::entry;
 use embedded_hal::digital::v2::ToggleableOutputPin;
 use panic_halt as _;
-use va108xx_hal::{pac, prelude::*};
+use va108xx_hal::{gpio::PinsA, pac, prelude::*};
 
 #[entry]
 fn main() -> ! {
     let mut dp = pac::Peripherals::take().unwrap();
-    let porta = dp.PORTA.split(&mut dp.SYSCONFIG).unwrap();
-    let mut led1 = porta
-        .pa10
-        .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
-    let mut led2 = porta
-        .pa7
-        .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
-    let mut led3 = porta
-        .pa6
-        .into_push_pull_output(&mut dp.IOCONFIG, &mut dp.PORTA);
+    let porta = PinsA::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTA);
+    let mut led1 = porta.pa10.into_push_pull_output();
+    let mut led2 = porta.pa7.into_push_pull_output();
+    let mut led3 = porta.pa6.into_push_pull_output();
     for _ in 0..10 {
         led1.set_low().ok();
         led2.set_low().ok();

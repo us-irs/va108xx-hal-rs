@@ -6,9 +6,10 @@ use libm::floorf;
 use crate::clock::enable_peripheral_clock;
 use crate::{
     clock,
-    gpio::porta::{PA16, PA17, PA18, PA19, PA2, PA26, PA27, PA3, PA30, PA31, PA8, PA9},
-    gpio::portb::{PB18, PB19, PB20, PB21, PB22, PB23, PB6, PB7, PB8, PB9},
-    gpio::{AltFunc, FUNSEL1, FUNSEL2, FUNSEL3},
+    gpio::pins::{
+        Alternate, Funsel1, Funsel2, Funsel3, Pin, PA16, PA17, PA18, PA19, PA2, PA26, PA27, PA3,
+        PA30, PA31, PA8, PA9, PB18, PB19, PB20, PB21, PB22, PB23, PB6, PB7, PB8, PB9,
+    },
     pac::{uarta as uart_base, SYSCONFIG, UARTA, UARTB},
     prelude::*,
     time::{Bps, Hertz},
@@ -18,20 +19,20 @@ use embedded_hal::{blocking, serial};
 
 pub trait Pins<UART> {}
 
-impl Pins<UARTA> for (PA9<AltFunc<FUNSEL2>>, PA8<AltFunc<FUNSEL2>>) {}
-impl Pins<UARTA> for (PA17<AltFunc<FUNSEL3>>, PA16<AltFunc<FUNSEL3>>) {}
-impl Pins<UARTA> for (PA31<AltFunc<FUNSEL3>>, PA30<AltFunc<FUNSEL3>>) {}
+impl Pins<UARTA> for (Pin<PA9, Alternate<Funsel2>>, Pin<PA8, Alternate<Funsel2>>) {}
+impl Pins<UARTA> for (Pin<PA17, Alternate<Funsel3>>, Pin<PA16, Alternate<Funsel3>>) {}
+impl Pins<UARTA> for (Pin<PA31, Alternate<Funsel3>>, Pin<PA30, Alternate<Funsel3>>) {}
 
-impl Pins<UARTA> for (PB9<AltFunc<FUNSEL1>>, PB8<AltFunc<FUNSEL1>>) {}
-impl Pins<UARTA> for (PB23<AltFunc<FUNSEL1>>, PB22<AltFunc<FUNSEL1>>) {}
+impl Pins<UARTA> for (Pin<PB9, Alternate<Funsel1>>, Pin<PB8, Alternate<Funsel1>>) {}
+impl Pins<UARTA> for (Pin<PB23, Alternate<Funsel1>>, Pin<PB22, Alternate<Funsel1>>) {}
 
-impl Pins<UARTB> for (PA3<AltFunc<FUNSEL2>>, PA2<AltFunc<FUNSEL2>>) {}
-impl Pins<UARTB> for (PA19<AltFunc<FUNSEL3>>, PA18<AltFunc<FUNSEL3>>) {}
-impl Pins<UARTB> for (PA27<AltFunc<FUNSEL3>>, PA26<AltFunc<FUNSEL3>>) {}
+impl Pins<UARTB> for (Pin<PA3, Alternate<Funsel2>>, Pin<PA2, Alternate<Funsel2>>) {}
+impl Pins<UARTB> for (Pin<PA19, Alternate<Funsel3>>, Pin<PA18, Alternate<Funsel3>>) {}
+impl Pins<UARTB> for (Pin<PA27, Alternate<Funsel3>>, Pin<PA26, Alternate<Funsel3>>) {}
 
-impl Pins<UARTB> for (PB7<AltFunc<FUNSEL1>>, PB6<AltFunc<FUNSEL1>>) {}
-impl Pins<UARTB> for (PB19<AltFunc<FUNSEL2>>, PB18<AltFunc<FUNSEL2>>) {}
-impl Pins<UARTB> for (PB21<AltFunc<FUNSEL1>>, PB20<AltFunc<FUNSEL1>>) {}
+impl Pins<UARTB> for (Pin<PB7, Alternate<Funsel1>>, Pin<PB6, Alternate<Funsel1>>) {}
+impl Pins<UARTB> for (Pin<PB19, Alternate<Funsel2>>, Pin<PB18, Alternate<Funsel2>>) {}
+impl Pins<UARTB> for (Pin<PB21, Alternate<Funsel1>>, Pin<PB20, Alternate<Funsel1>>) {}
 
 #[derive(Debug)]
 pub enum Error {

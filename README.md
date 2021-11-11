@@ -77,7 +77,7 @@ is contained within the
 	embedded-hal = "0.2.6"
 
 	[dependencies.va108xx-hal]
-	version = "0.1"
+	version = "0.2"
 	features = ["rt"]
    ```
 
