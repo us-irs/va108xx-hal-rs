@@ -1,4 +1,4 @@
-//! # GPIO module
+//! # API for the GPIO peripheral
 //!
 //! The implementation of this GPIO module is heavily based on the
 //! [ATSAMD HAL implementation](https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/gpio/v2/index.html).

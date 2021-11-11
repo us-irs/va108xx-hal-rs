@@ -200,11 +200,13 @@ pub(super) unsafe trait RegisterInterface {
         }
     }
 
+    #[inline]
     fn get_perid(&self) -> u32 {
         let portreg = self.port_reg();
         portreg.perid.read().bits()
     }
 
+    #[inline]
     /// Read the logic level of an output pin
     fn read_pin(&self) -> bool {
         let portreg = self.port_reg();
@@ -220,27 +222,25 @@ pub(super) unsafe trait RegisterInterface {
 
     /// Read a pin but use the masked version but check whether the datamask for the pin is
     /// cleared as well
+    #[inline]
     fn read_pin_masked(&self) -> Result<bool, PinError> {
         if !self.datamask() {
             Err(PinError::IsMasked)
         } else {
-            let portreg = self.port_reg();
-            Ok(((portreg.datain().read().bits() >> self.id().num) & 0x01) == 1)
+            Ok(((self.port_reg().datain().read().bits() >> self.id().num) & 0x01) == 1)
         }
     }
 
     /// Write the logic level of an output pin
     #[inline]
     fn write_pin(&mut self, bit: bool) {
-        let portreg = self.port_reg();
-        let mask = self.mask_32();
         // Safety: SETOUT is a "mask" register, and we only write the bit for
         // this pin ID
         unsafe {
             if bit {
-                portreg.setout().write(|w| w.bits(mask));
+                self.port_reg().setout().write(|w| w.bits(self.mask_32()));
             } else {
-                portreg.clrout().write(|w| w.bits(mask));
+                self.port_reg().clrout().write(|w| w.bits(self.mask_32()));
             }
         }
     }
@@ -252,15 +252,13 @@ pub(super) unsafe trait RegisterInterface {
         if !self.datamask() {
             Err(PinError::IsMasked)
         } else {
-            let portreg = self.port_reg();
-            let mask = self.mask_32();
             // Safety: SETOUT is a "mask" register, and we only write the bit for
             // this pin ID
             unsafe {
                 if bit {
-                    portreg.setout().write(|w| w.bits(mask));
+                    self.port_reg().setout().write(|w| w.bits(self.mask_32()));
                 } else {
-                    portreg.clrout().write(|w| w.bits(mask));
+                    self.port_reg().clrout().write(|w| w.bits(self.mask_32()));
                 }
                 Ok(())
             }
@@ -270,18 +268,15 @@ pub(super) unsafe trait RegisterInterface {
     /// Toggle the logic level of an output pin
     #[inline]
     fn toggle(&mut self) {
-        let portreg = self.port_reg();
-        let mask = self.mask_32();
         // Safety: TOGOUT is a "mask" register, and we only write the bit for
         // this pin ID
-        unsafe { portreg.togout().write(|w| w.bits(mask)) };
+        unsafe { self.port_reg().togout().write(|w| w.bits(self.mask_32())) };
     }
 
     /// Only useful for input pins
     #[inline]
     fn filter_type(&self, filter: FilterType, clksel: FilterClkSel) {
-        let iocfg = self.iocfg_port();
-        iocfg.port[self.id().num as usize].modify(|_, w| {
+        self.iocfg_port().port[self.id().num as usize].modify(|_, w| {
             // Safety: Only write to register for this Pin ID
             unsafe {
                 w.flttype().bits(filter as u8);
