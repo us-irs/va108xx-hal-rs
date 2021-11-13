@@ -5,7 +5,10 @@
 //! - [MS and second tick implementation](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/timer-ticks.rs)
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
+    pac,
+    prelude::*,
     time::Hertz,
+    timer,
 };
 use embedded_hal::timer::{Cancel, CountDown, Periodic};
 use va108xx::{Interrupt, IRQSEL, SYSCONFIG};
@@ -158,6 +161,20 @@ macro_rules! timers {
             }
         )+
     }
+}
+
+// Set up a millisecond timer on TIM0. Please note that you still need to unmask the related IRQ
+// and provide an IRQ handler yourself
+pub fn set_up_ms_timer(
+    syscfg: &mut pac::SYSCONFIG,
+    irqsel: &mut pac::IRQSEL,
+    sys_clk: Hertz,
+    tim0: TIM0,
+    irq: pac::Interrupt,
+) {
+    let mut ms_timer = CountDownTimer::tim0(syscfg, sys_clk, tim0);
+    ms_timer.listen(timer::Event::TimeOut, syscfg, irqsel, irq);
+    ms_timer.start(1000.hz());
 }
 
 timers! {

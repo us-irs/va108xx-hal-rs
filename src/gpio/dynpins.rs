@@ -57,9 +57,17 @@
 //! operation, the trait functions will return
 //! [`InvalidPinType`](Error::InvalidPinType).
 
-use super::pins::{FilterClkSel, FilterType, Pin, PinError, PinId, PinMode, PinState};
+use super::pins::{
+    common_reg_if_functions, FilterType, InterruptEdge, InterruptLevel, Pin, PinError, PinId,
+    PinMode, PinState,
+};
 use super::reg::RegisterInterface;
+use crate::{
+    clock::FilterClkSel,
+    pac::{self, IRQSEL, SYSCONFIG},
+};
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
+use paste::paste;
 
 //==================================================================================================
 //  DynPinMode configurations
@@ -293,42 +301,7 @@ impl DynPin {
         self.into_mode(DYN_RD_OPEN_DRAIN_OUTPUT);
     }
 
-    #[inline]
-    pub fn datamask(&self) -> bool {
-        self.regs.datamask()
-    }
-
-    #[inline]
-    pub fn clear_datamask(self) -> Self {
-        self.regs.clear_datamask();
-        self
-    }
-
-    #[inline]
-    pub fn set_datamask(self) -> Self {
-        self.regs.set_datamask();
-        self
-    }
-
-    #[inline]
-    pub fn is_high_masked(&self) -> Result<bool, PinError> {
-        self.regs.read_pin_masked()
-    }
-
-    #[inline]
-    pub fn is_low_masked(&self) -> Result<bool, PinError> {
-        self.regs.read_pin_masked().map(|v| !v)
-    }
-
-    #[inline]
-    pub fn set_high_masked(&mut self) -> Result<(), PinError> {
-        self.regs.write_pin_masked(true)
-    }
-
-    #[inline]
-    pub fn set_low_masked(&mut self) -> Result<(), PinError> {
-        self.regs.write_pin_masked(false)
-    }
+    common_reg_if_functions!();
 
     /// See p.53 of the programmers guide for more information.
     /// Possible delays in clock cycles:
@@ -365,6 +338,40 @@ impl DynPin {
         match self.mode {
             DynPinMode::Input(_) => {
                 self.regs.filter_type(filter, clksel);
+                Ok(self)
+            }
+            _ => Err(PinError::InvalidPinType),
+        }
+    }
+
+    pub fn interrupt_edge(
+        mut self,
+        edge_type: InterruptEdge,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: pac::Interrupt,
+    ) -> Result<Self, PinError> {
+        match self.mode {
+            DynPinMode::Input(_) | DynPinMode::Output(_) => {
+                self._irq_enb(syscfg, irqsel, interrupt);
+                self.regs.interrupt_edge(edge_type);
+                Ok(self)
+            }
+            _ => Err(PinError::InvalidPinType),
+        }
+    }
+
+    pub fn interrupt_level(
+        mut self,
+        level_type: InterruptLevel,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: crate::pac::Interrupt,
+    ) -> Result<Self, PinError> {
+        match self.mode {
+            DynPinMode::Input(_) | DynPinMode::Output(_) => {
+                self._irq_enb(syscfg, irqsel, interrupt);
+                self.regs.interrupt_level(level_type);
                 Ok(self)
             }
             _ => Err(PinError::InvalidPinType),

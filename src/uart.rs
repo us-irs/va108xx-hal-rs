@@ -1,6 +1,7 @@
 //! # API for the UART peripheral
 //!
 //! ## Examples
+//!
 //! - [UART example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/uart.rs)
 use core::{convert::Infallible, ptr};
 use core::{marker::PhantomData, ops::Deref};

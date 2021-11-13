@@ -1,5 +1,6 @@
 use super::dynpins::{self, DynGroup, DynPinId, DynPinMode};
-use super::pins::{FilterClkSel, FilterType, PinError, PinState};
+use super::pins::{FilterType, InterruptEdge, InterruptLevel, PinError, PinState};
+use crate::clock::FilterClkSel;
 use va108xx::{ioconfig, porta, IOCONFIG, PORTA, PORTB};
 
 /// Type definition to avoid confusion: These register blocks are identical
@@ -31,16 +32,13 @@ impl From<DynPinMode> for ModeFields {
                 use dynpins::DynInput::*;
                 fields.dir = false;
                 match config {
-                    Floating => {
-                        fields.pull_en = false;
-                    }
+                    Floating => (),
                     PullUp => {
                         fields.pull_en = true;
                         fields.pull_dir = true;
                     }
                     PullDown => {
                         fields.pull_en = true;
-                        fields.pull_dir = false;
                     }
                 }
             }
@@ -48,9 +46,7 @@ impl From<DynPinMode> for ModeFields {
                 use dynpins::DynOutput::*;
                 fields.dir = true;
                 match config {
-                    PushPull => {
-                        fields.opendrn = false;
-                    }
+                    PushPull => (),
                     OpenDrain => {
                         fields.opendrn = true;
                     }
@@ -60,7 +56,6 @@ impl From<DynPinMode> for ModeFields {
                     }
                     ReadablePushPull => {
                         fields.enb_input = true;
-                        fields.opendrn = false;
                     }
                 }
             }
@@ -154,6 +149,8 @@ pub(super) unsafe trait RegisterInterface {
         unsafe {
             if dir {
                 portreg.dir().modify(|r, w| w.bits(r.bits() | mask));
+                // Clear output
+                portreg.clrout().write(|w| w.bits(mask));
             } else {
                 portreg.dir().modify(|r, w| w.bits(r.bits() & !mask));
             }
@@ -198,6 +195,20 @@ pub(super) unsafe trait RegisterInterface {
                 portreg.dir().modify(|r, w| w.bits(r.bits() & !mask));
             }
         }
+    }
+
+    #[inline]
+    fn enable_irq(&self) {
+        self.port_reg()
+            .irq_enb
+            .modify(|r, w| unsafe { w.bits(r.bits() | self.mask_32()) });
+    }
+
+    #[inline]
+    fn disable_irq(&self) {
+        self.port_reg()
+            .irq_enb
+            .modify(|r, w| unsafe { w.bits(r.bits() & !self.mask_32()) });
     }
 
     #[inline]
@@ -271,6 +282,53 @@ pub(super) unsafe trait RegisterInterface {
         // Safety: TOGOUT is a "mask" register, and we only write the bit for
         // this pin ID
         unsafe { self.port_reg().togout().write(|w| w.bits(self.mask_32())) };
+    }
+
+    /// Only useful for interrupt pins. Configure whether to use edges or level as interrupt soure
+    /// When using edge mode, it is possible to generate interrupts on both edges as well
+    #[inline]
+    fn interrupt_edge(&mut self, edge_type: InterruptEdge) {
+        unsafe {
+            self.port_reg()
+                .irq_sen
+                .modify(|r, w| w.bits(r.bits() & !self.mask_32()));
+            match edge_type {
+                InterruptEdge::HighToLow => {
+                    self.port_reg()
+                        .irq_evt
+                        .modify(|r, w| w.bits(r.bits() & !self.mask_32()));
+                }
+                InterruptEdge::LowToHigh => {
+                    self.port_reg()
+                        .irq_evt
+                        .modify(|r, w| w.bits(r.bits() | self.mask_32()));
+                }
+                InterruptEdge::BothEdges => {
+                    self.port_reg()
+                        .irq_edge
+                        .modify(|r, w| w.bits(r.bits() | self.mask_32()));
+                }
+            }
+        }
+    }
+
+    /// Configure which edge or level type triggers an interrupt
+    #[inline]
+    fn interrupt_level(&mut self, level: InterruptLevel) {
+        unsafe {
+            self.port_reg()
+                .irq_sen
+                .modify(|r, w| w.bits(r.bits() | self.mask_32()));
+            if level == InterruptLevel::Low {
+                self.port_reg()
+                    .irq_evt
+                    .modify(|r, w| w.bits(r.bits() & !self.mask_32()));
+            } else {
+                self.port_reg()
+                    .irq_evt
+                    .modify(|r, w| w.bits(r.bits() | self.mask_32()));
+            }
+        }
     }
 
     /// Only useful for input pins

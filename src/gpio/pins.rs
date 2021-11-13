@@ -89,9 +89,11 @@
 
 use super::dynpins::{DynAlternate, DynGroup, DynInput, DynOutput, DynPinId, DynPinMode};
 use super::reg::RegisterInterface;
-use crate::pac::{IOCONFIG, PORTA, PORTB, SYSCONFIG};
-use crate::typelevel::Is;
-use crate::Sealed;
+use crate::{
+    pac::{self, IOCONFIG, IRQSEL, PORTA, PORTB, SYSCONFIG},
+    typelevel::Is,
+    Sealed,
+};
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
@@ -100,6 +102,19 @@ use paste::paste;
 //==================================================================================================
 //  Errors and Definitions
 //==================================================================================================
+
+#[derive(Debug, PartialEq)]
+pub enum InterruptEdge {
+    HighToLow,
+    LowToHigh,
+    BothEdges,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InterruptLevel {
+    Low = 0,
+    High = 1,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum PinState {
@@ -164,6 +179,7 @@ pub struct Input<C: InputConfig> {
 
 impl<C: InputConfig> Sealed for Input<C> {}
 
+#[derive(Debug, PartialEq)]
 pub enum FilterType {
     SystemClock = 0,
     DirectInputWithSynchronization = 1,
@@ -173,16 +189,7 @@ pub enum FilterType {
     FilterFourClockCycles = 5,
 }
 
-pub enum FilterClkSel {
-    SysClk = 0,
-    Clk1 = 1,
-    Clk2 = 2,
-    Clk3 = 3,
-    Clk4 = 4,
-    Clk5 = 5,
-    Clk6 = 6,
-    Clk7 = 7,
-}
+pub use crate::clock::FilterClkSel;
 
 //==================================================================================================
 // Output configuration
@@ -347,6 +354,77 @@ impl<I: PinId, M: PinMode> AnyPin for Pin<I, M> {
     type Mode = M;
 }
 
+macro_rules! common_reg_if_functions {
+    () => {
+        paste!(
+            #[inline]
+            pub fn datamask(&self) -> bool {
+                self.regs.datamask()
+            }
+
+            #[inline]
+            pub fn clear_datamask(self) -> Self {
+                self.regs.clear_datamask();
+                self
+            }
+
+            #[inline]
+            pub fn set_datamask(self) -> Self {
+                self.regs.set_datamask();
+                self
+            }
+
+            #[inline]
+            pub fn is_high_masked(&self) -> Result<bool, PinError> {
+                self.regs.read_pin_masked()
+            }
+
+            #[inline]
+            pub fn is_low_masked(&self) -> Result<bool, PinError> {
+                self.regs.read_pin_masked().map(|v| !v)
+            }
+
+            #[inline]
+            pub fn set_high_masked(&mut self) -> Result<(), PinError> {
+                self.regs.write_pin_masked(true)
+            }
+
+            #[inline]
+            pub fn set_low_masked(&mut self) -> Result<(), PinError> {
+                self.regs.write_pin_masked(false)
+            }
+
+            fn _irq_enb(
+                &mut self,
+                syscfg: Option<&mut va108xx::SYSCONFIG>,
+                irqsel: &mut va108xx::IRQSEL,
+                interrupt: va108xx::Interrupt,
+            ) {
+                if syscfg.is_some() {
+                    crate::clock::enable_peripheral_clock(
+                        syscfg.unwrap(),
+                        crate::clock::PeripheralClocks::Irqsel,
+                    );
+                }
+                self.regs.enable_irq();
+                match self.regs.id().group {
+                    // Set the correct interrupt number in the IRQSEL register
+                    DynGroup::A => {
+                        irqsel.porta[self.regs.id().num as usize]
+                            .write(|w| unsafe { w.bits(interrupt as u32) });
+                    }
+                    DynGroup::B => {
+                        irqsel.portb[self.regs.id().num as usize]
+                            .write(|w| unsafe { w.bits(interrupt as u32) });
+                    }
+                }
+            }
+        );
+    };
+}
+
+pub(crate) use common_reg_if_functions;
+
 impl<I: PinId, M: PinMode> Pin<I, M> {
     /// Create a new [`Pin`]
     ///
@@ -429,42 +507,7 @@ impl<I: PinId, M: PinMode> Pin<I, M> {
         self.into_mode()
     }
 
-    #[inline]
-    pub fn datamask(&self) -> bool {
-        self.regs.datamask()
-    }
-
-    #[inline]
-    pub fn clear_datamask(self) -> Self {
-        self.regs.clear_datamask();
-        self
-    }
-
-    #[inline]
-    pub fn set_datamask(self) -> Self {
-        self.regs.set_datamask();
-        self
-    }
-
-    #[inline]
-    pub fn is_high_masked(&self) -> Result<bool, PinError> {
-        self.regs.read_pin_masked()
-    }
-
-    #[inline]
-    pub fn is_low_masked(&self) -> Result<bool, PinError> {
-        self.regs.read_pin_masked().map(|v| !v)
-    }
-
-    #[inline]
-    pub fn set_high_masked(&mut self) -> Result<(), PinError> {
-        self.regs.write_pin_masked(true)
-    }
-
-    #[inline]
-    pub fn set_low_masked(&mut self) -> Result<(), PinError> {
-        self.regs.write_pin_masked(false)
-    }
+    common_reg_if_functions!();
 
     #[inline]
     pub(crate) fn _set_high(&mut self) {
@@ -526,6 +569,32 @@ impl<I: PinId, M: PinMode> AsMut<Self> for Pin<I, M> {
 //  Additional functionality
 //==================================================================================================
 
+impl<I: PinId, C: InputConfig> Pin<I, Input<C>> {
+    pub fn interrupt_edge(
+        mut self,
+        edge_type: InterruptEdge,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: pac::Interrupt,
+    ) -> Self {
+        self._irq_enb(syscfg, irqsel, interrupt);
+        self.regs.interrupt_edge(edge_type);
+        self
+    }
+
+    pub fn interrupt_level(
+        mut self,
+        level_type: InterruptLevel,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: pac::Interrupt,
+    ) -> Self {
+        self._irq_enb(syscfg, irqsel, interrupt);
+        self.regs.interrupt_level(level_type);
+        self
+    }
+}
+
 impl<I: PinId, C: OutputConfig> Pin<I, Output<C>> {
     /// See p.53 of the programmers guide for more information.
     /// Possible delays in clock cycles:
@@ -543,6 +612,30 @@ impl<I: PinId, C: OutputConfig> Pin<I, Output<C>> {
     /// one clock cycle before returning to the configured default state
     pub fn pulse_mode(self, enable: bool, default_state: PinState) -> Self {
         self.regs.pulse_mode(enable, default_state);
+        self
+    }
+
+    pub fn interrupt_edge(
+        mut self,
+        edge_type: InterruptEdge,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: pac::Interrupt,
+    ) -> Self {
+        self._irq_enb(syscfg, irqsel, interrupt);
+        self.regs.interrupt_edge(edge_type);
+        self
+    }
+
+    pub fn interrupt_level(
+        mut self,
+        level_type: InterruptLevel,
+        syscfg: Option<&mut SYSCONFIG>,
+        irqsel: &mut IRQSEL,
+        interrupt: pac::Interrupt,
+    ) -> Self {
+        self._irq_enb(syscfg, irqsel, interrupt);
+        self.regs.interrupt_level(level_type);
         self
     }
 }
@@ -687,7 +780,7 @@ macro_rules! pins {
                 )+
             }
 
-            impl $PinsName{
+            impl $PinsName {
                 /// Create a new struct containing all the Pins. Passing the IOCONFIG peripheral
                 /// is optional because it might be required to create pin definitions for both
                 /// ports.
