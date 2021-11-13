@@ -8,9 +8,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+## [0.2.1]
+
+### Added
+
+- Adds the IRQ interface to configure interrupts on output and input pins
+- Utility function to set up millisecond timer with `TIM0`
+- Function to set clock divisor registers in `clock` module
+
 ### Changed
 
 - Minor optimizations and tweaks for GPIO module
+- Moved the `FilterClkSel` struct to the `clock` module, re-exporting in `gpio`
+- Clearing output state at initialization of Output pins
 
 ## [0.2.0]
 

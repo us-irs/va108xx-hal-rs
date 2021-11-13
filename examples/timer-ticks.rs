@@ -12,7 +12,7 @@ use va108xx_hal::{
     pac::{self, interrupt},
     prelude::*,
     time::Hertz,
-    timer::{CountDownTimer, Event},
+    timer::{set_up_ms_timer, CountDownTimer, Event},
 };
 
 #[allow(dead_code)]
@@ -65,23 +65,21 @@ fn main() -> ! {
             }
         }
         LibType::Hal => {
-            let mut ms_timer =
-                CountDownTimer::tim0(&mut dp.SYSCONFIG, get_sys_clock().unwrap(), dp.TIM0);
-            let mut second_timer =
-                CountDownTimer::tim1(&mut dp.SYSCONFIG, get_sys_clock().unwrap(), dp.TIM1);
-            ms_timer.listen(
-                Event::TimeOut,
+            set_up_ms_timer(
                 &mut dp.SYSCONFIG,
                 &mut dp.IRQSEL,
+                50.mhz().into(),
+                dp.TIM0,
                 interrupt::OC0,
             );
+            let mut second_timer =
+                CountDownTimer::tim1(&mut dp.SYSCONFIG, get_sys_clock().unwrap(), dp.TIM1);
             second_timer.listen(
                 Event::TimeOut,
                 &mut dp.SYSCONFIG,
                 &mut dp.IRQSEL,
                 interrupt::OC1,
             );
-            ms_timer.start(1000.hz());
             second_timer.start(1.hz());
             unmask_irqs();
         }
