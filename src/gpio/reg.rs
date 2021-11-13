@@ -233,7 +233,7 @@ pub(super) unsafe trait RegisterInterface {
 
     /// Read a pin but use the masked version but check whether the datamask for the pin is
     /// cleared as well
-    #[inline]
+    #[inline(always)]
     fn read_pin_masked(&self) -> Result<bool, PinError> {
         if !self.datamask() {
             Err(PinError::IsMasked)
@@ -243,7 +243,7 @@ pub(super) unsafe trait RegisterInterface {
     }
 
     /// Write the logic level of an output pin
-    #[inline]
+    #[inline(always)]
     fn write_pin(&mut self, bit: bool) {
         // Safety: SETOUT is a "mask" register, and we only write the bit for
         // this pin ID
@@ -277,7 +277,7 @@ pub(super) unsafe trait RegisterInterface {
     }
 
     /// Toggle the logic level of an output pin
-    #[inline]
+    #[inline(always)]
     fn toggle(&mut self) {
         // Safety: TOGOUT is a "mask" register, and we only write the bit for
         // this pin ID
