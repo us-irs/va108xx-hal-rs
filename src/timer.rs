@@ -10,17 +10,26 @@ use crate::{
     time::Hertz,
     timer,
 };
-use embedded_hal::timer::{Cancel, CountDown, Periodic};
+use core::cell::Cell;
+use cortex_m::interrupt::Mutex;
+use embedded_hal::{
+    blocking::delay,
+    timer::{Cancel, CountDown, Periodic},
+};
 use va108xx::{Interrupt, IRQSEL, SYSCONFIG};
 use void::Void;
 
 const IRQ_DST_NONE: u32 = 0xffffffff;
+pub static MS_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
 /// Hardware timers
 pub struct CountDownTimer<TIM> {
     tim: TIM,
+    curr_freq: Hertz,
     sys_clk: Hertz,
+    rst_val: u32,
     last_cnt: u32,
+    listening: bool,
 }
 
 /// Interrupt events
@@ -57,6 +66,9 @@ macro_rules! timers {
                     CountDownTimer {
                         tim,
                         sys_clk,
+                        rst_val: 0,
+                        curr_freq: 0.hz(),
+                        listening: false,
                         last_cnt: 0,
                     }
                 }
@@ -76,6 +88,7 @@ macro_rules! timers {
                             enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
                             irqsel.tim[$i].write(|w| unsafe { w.bits(interrupt as u32) });
                             self.tim.ctrl.modify(|_, w| w.irq_enb().set_bit());
+                            self.listening = true;
                         }
                     }
                 }
@@ -88,6 +101,7 @@ macro_rules! timers {
                             enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
                             irqsel.tim[$i].write(|w| unsafe { w.bits(IRQ_DST_NONE) });
                             self.tim.ctrl.modify(|_, w| w.irq_enb().clear_bit());
+                            self.listening = false;
                         }
                     }
                 }
@@ -117,6 +131,14 @@ macro_rules! timers {
                     }
                     self
                 }
+
+                pub fn curr_freq(&self) -> Hertz {
+                    self.curr_freq
+                }
+
+                pub fn listening(&self) -> bool {
+                    self.listening
+                }
             }
 
             /// CountDown implementation for TIMx
@@ -127,21 +149,28 @@ macro_rules! timers {
                 where
                     T: Into<Hertz>,
                 {
-                    self.last_cnt = self.sys_clk.0 / timeout.into().0 - 1;
+                    self.tim.ctrl.modify(|_, w| w.enable().clear_bit());
+                    self.curr_freq = timeout.into();
+                    self.rst_val = self.sys_clk.0 / self.curr_freq.0;
                     unsafe {
-                        self.tim.rst_value.write(|w| w.bits(self.last_cnt));
-                        self.tim.cnt_value.write(|w| w.bits(self.last_cnt));
+                        self.tim.rst_value.write(|w| w.bits(self.rst_val));
+                        self.tim.cnt_value.write(|w| w.bits(self.rst_val));
                     }
+                    self.tim.ctrl.modify(|_, w| w.enable().set_bit());
                 }
 
-                /// Return `Ok` if the timer has wrapped
-                /// Automatically clears the flag and restarts the time
+                /// Return `Ok` if the timer has wrapped. Peripheral will automatically clear the
+                /// flag and restart the time if configured correctly
                 fn wait(&mut self) -> nb::Result<(), Void> {
                     let cnt = self.tim.cnt_value.read().bits();
-                    if cnt == 0 || cnt < self.last_cnt {
-                        self.last_cnt = cnt;
+                    if cnt > self.last_cnt {
+                        self.last_cnt = self.rst_val;
+                        Ok(())
+                    } else if cnt == 0 {
+                        self.last_cnt = self.rst_val;
                         Ok(())
                     } else {
+                        self.last_cnt = cnt;
                         Err(nb::Error::WouldBlock)
                     }
                 }
@@ -159,6 +188,60 @@ macro_rules! timers {
                     Ok(())
                 }
             }
+
+            /// Delay for microseconds.
+            ///
+            /// For delays less than 100 us, an assembly delay will be used.
+            /// For larger delays, the timer peripheral will be used.
+            /// Please note that the delay using the peripheral might not
+            /// work properly in debug mode.
+            impl delay::DelayUs<u32> for CountDownTimer<$TIM> {
+                fn delay_us(&mut self, us: u32) {
+                    if(us < 100) {
+                       cortex_m::asm::delay(us * (self.sys_clk.0 / 2_000_000));
+                    } else {
+                        // Configuring the peripheral for higher frequencies is unstable
+                        self.start(1000.khz());
+                        // The subtracted value is an empirical value measures by using tests with
+                        // an oscilloscope.
+                        for _ in 0..us - 7 {
+                            nb::block!(self.wait()).unwrap();
+                        }
+                    }
+                }
+            }
+            /// Forwards call to u32 variant of delay
+            impl delay::DelayUs<u16> for CountDownTimer<$TIM> {
+                fn delay_us(&mut self, us: u16) {
+                    self.delay_us(u32::from(us));
+                }
+            }
+            /// Forwards call to u32 variant of delay
+            impl delay::DelayUs<u8> for CountDownTimer<$TIM> {
+                fn delay_us(&mut self, us: u8) {
+                    self.delay_us(u32::from(us));
+                }
+            }
+
+            impl delay::DelayMs<u32> for CountDownTimer<$TIM> {
+                fn delay_ms(&mut self, ms: u32) {
+                    self.start(1000.hz());
+                    for _ in 0..ms {
+                        nb::block!(self.wait()).unwrap();
+                    }
+                }
+            }
+            impl delay::DelayMs<u16> for CountDownTimer<$TIM> {
+                fn delay_ms(&mut self, ms: u16) {
+                    self.delay_ms(u32::from(ms));
+                }
+            }
+            impl embedded_hal::blocking::delay::DelayMs<u8> for CountDownTimer<$TIM> {
+                fn delay_ms(&mut self, ms: u8) {
+                    self.delay_ms(u32::from(ms));
+                }
+            }
+
         )+
     }
 }
@@ -171,10 +254,26 @@ pub fn set_up_ms_timer(
     sys_clk: Hertz,
     tim0: TIM0,
     irq: pac::Interrupt,
-) {
+) -> CountDownTimer<TIM0> {
     let mut ms_timer = CountDownTimer::tim0(syscfg, sys_clk, tim0);
     ms_timer.listen(timer::Event::TimeOut, syscfg, irqsel, irq);
     ms_timer.start(1000.hz());
+    ms_timer
+}
+
+/// This function can be called in a specified interrupt handler to increment
+/// the MS counter
+pub fn default_ms_irq_handler() {
+    cortex_m::interrupt::free(|cs| {
+        let mut ms = MS_COUNTER.borrow(cs).get();
+        ms += 1;
+        MS_COUNTER.borrow(cs).set(ms);
+    });
+}
+
+/// Get the current MS tick count
+pub fn get_ms_ticks() -> u32 {
+    cortex_m::interrupt::free(|cs| MS_COUNTER.borrow(cs).get())
 }
 
 timers! {
@@ -202,4 +301,31 @@ timers! {
     TIM21: (tim21, 21),
     TIM22: (tim22, 22),
     TIM23: (tim23, 23),
+}
+
+//==================================================================================================
+// Delay implementations
+//==================================================================================================
+
+pub struct Delay {
+    cd_tim: CountDownTimer<TIM0>,
+}
+
+impl Delay {
+    pub fn new(tim0: CountDownTimer<TIM0>) -> Self {
+        Delay { cd_tim: tim0 }
+    }
+}
+
+/// This assumes that the user has already set up a MS tick timer in TIM0 as a system tick
+impl embedded_hal::blocking::delay::DelayMs<u32> for Delay {
+    fn delay_ms(&mut self, ms: u32) {
+        if self.cd_tim.curr_freq() != 1000.hz() || !self.cd_tim.listening() {
+            return;
+        }
+        let start_time = get_ms_ticks();
+        while get_ms_ticks() - start_time < ms {
+            cortex_m::asm::nop();
+        }
+    }
 }
