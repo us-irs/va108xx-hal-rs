@@ -43,3 +43,7 @@ opt-level = "s"
 [[example]]
 name = "timer-ticks"
 required-features = ["rt"]
+
+[[example]]
+name = "tests"
+required-features = ["rt"]
