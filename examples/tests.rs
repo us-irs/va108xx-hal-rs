@@ -44,7 +44,7 @@ fn main() -> ! {
     let pinsa = PinsA::new(&mut dp.SYSCONFIG, None, dp.PORTA);
     let pinsb = PinsB::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTB);
     let mut led1 = pinsa.pa10.into_push_pull_output();
-    let test_case = TestCase::DelayMs;
+    let test_case = TestCase::DelayGpio;
 
     match test_case {
         TestCase::TestBasic
