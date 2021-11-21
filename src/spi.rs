@@ -363,25 +363,18 @@ macro_rules! spi {
             {
                 /// Create a new SPI struct
                 ///
-                /// This function has the optional feature to transfer the configuration.
-                /// This configuration struct requires a generic type information to enforce
-                /// the correct configuration of hardware chip select pins. If you are not using
-                /// this feature you can use
-                ///
-                /// ```
-                /// let spia = Spi::spia::<NoneT>(
-                ///    ...
-                /// )
-                /// ```
-                ///
-                /// in the function call. You can delete the pin type information by calling
-                /// the [`downgrade`](Self::downgrade) function
+                /// You can delete the pin type information by calling the
+                /// [`downgrade`](Self::downgrade) function
                 ///
                 /// ## Arguments
-                /// * `transfer_cfg` - Transfer configuration which includes configuration
-                ///     which can change across individual SPI transfers like SPI mode or SPI clock.
-                ///     If only one device is connected, this configuration only needs to be done
-                ///     once.
+                /// * `spi` - SPI bus to use
+                /// * `pins` - Pins to be used for SPI transactions. These pins are consumed
+                ///     to ensure the pins can not be used for other purposes anymore
+                /// * `spi_cfg` - Configuration specific to the SPI bus
+                /// * `transfer_cfg` - Optional initial transfer configuration which includes
+                ///     configuration which can change across individual SPI transfers like SPI mode
+                ///     or SPI clock. If only one device is connected, this configuration only needs
+                ///     to be done once.
                 /// * `syscfg` - Can be passed optionally to enable the peripheral clock
                 pub fn $spix(
                     spi: $SPIX,
