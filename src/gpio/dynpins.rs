@@ -55,7 +55,7 @@
 //! `Error = core::convert::Infallible`, the value-level API can return a real
 //! error. If the [`DynPin`] is not in the correct [`DynPinMode`] for the
 //! operation, the trait functions will return
-//! [`InvalidPinType`](Error::InvalidPinType).
+//! [`InvalidPinType`](PinError::InvalidPinType).
 
 use super::pins::{
     common_reg_if_functions, FilterType, InterruptEdge, InterruptLevel, Pin, PinError, PinId,

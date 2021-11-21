@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - DelayUs and DelayMs trait implementations for timer
-- SPI implementation for blocking API
+- SPI implementation for blocking API, supports blockmode as well
 
 ## [0.2.1]
 

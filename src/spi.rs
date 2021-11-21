@@ -1,4 +1,8 @@
 //! API for the SPI peripheral
+//!
+//! ## Examples
+//!
+//! - [Blocking SPI example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/spi.rs)
 use crate::Sealed;
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
@@ -181,6 +185,8 @@ pub trait GenericTransferConfig {
     fn frequency(&mut self, spi_clk: Hertz);
 }
 
+/// This struct contains all configuration parameter which are transfer specific
+/// and might change for transfers to different SPI slaves
 #[derive(Copy, Clone)]
 pub struct TransferConfig<HWCS> {
     pub spi_clk: Hertz,
@@ -189,7 +195,28 @@ pub struct TransferConfig<HWCS> {
     /// false
     pub hw_cs: Option<HWCS>,
     pub sod: bool,
+    /// If this is enabled, all data in the FIFO is transmitted in a single frame unless
+    /// the BMSTOP bit is set on a dataword. A frame is defined as CSn being active for the
+    /// duration of multiple data words
     pub blockmode: bool,
+}
+
+impl<HWCS> TransferConfig<HWCS> {
+    pub fn new(
+        spi_clk: Hertz,
+        mode: Mode,
+        hw_cs: Option<HWCS>,
+        blockmode: bool,
+        sod: bool,
+    ) -> Self {
+        TransferConfig {
+            spi_clk,
+            mode,
+            hw_cs,
+            sod,
+            blockmode,
+        }
+    }
 }
 
 impl<HWCS> GenericTransferConfig for TransferConfig<HWCS> {
@@ -208,32 +235,6 @@ impl<HWCS> GenericTransferConfig for TransferConfig<HWCS> {
 
     fn frequency(&mut self, spi_clk: Hertz) {
         self.spi_clk = spi_clk;
-    }
-}
-
-/// Configuration options for a single transfer. These can be used to reconfigure the SPI bus
-/// for transaction to different devices
-impl<HWCS: OptionalHwCs<SPIA>> TransferConfig<HWCS> {
-    pub fn cfg_spia(spi_clk: Hertz, mode: Mode, hw_cs: Option<HWCS>) -> Self {
-        TransferConfig {
-            spi_clk,
-            mode,
-            hw_cs,
-            sod: false,
-            blockmode: false,
-        }
-    }
-}
-
-impl<HWCS: OptionalHwCs<SPIB>> TransferConfig<HWCS> {
-    pub fn cfg_spib(spi_clk: Hertz, mode: Mode, hw_cs: Option<HWCS>) -> Self {
-        TransferConfig {
-            spi_clk,
-            mode,
-            hw_cs,
-            sod: false,
-            blockmode: false,
-        }
     }
 }
 
@@ -301,6 +302,7 @@ pub struct SpiBase<SPI, Word = u8> {
     spi: SPI,
     cfg: SpiConfig,
     sys_clk: Hertz,
+    blockmode: bool,
     _word: PhantomData<Word>,
 }
 pub struct Spi<SPI, PINS, Word = u8> {
@@ -330,7 +332,8 @@ macro_rules! spi {
                 /// )
                 /// ```
                 ///
-                /// in the function call
+                /// in the function call. You can delete the pin type information by calling
+                /// the [`downgrade`](Self::downgrade) function
                 ///
                 /// ## Arguments
                 /// * `transfer_cfg` - Transfer configuration which includes configuration
@@ -359,12 +362,14 @@ macro_rules! spi {
                     let mut mode = MODE_0;
                     let mut clk_prescale = 0x02;
                     let mut ss = 0;
+                    let mut init_blockmode = false;
                     if let Some(transfer_cfg) = transfer_cfg {
                         mode = transfer_cfg.mode;
                         clk_prescale = sys_clk.0 / (transfer_cfg.spi_clk.0 * (scrdv as u32 + 1));
                         if  transfer_cfg.hw_cs.is_some() {
                             ss = HwCs::CS_ID as u8;
                         }
+                        init_blockmode = transfer_cfg.blockmode;
                     }
 
                     let (cpo_bit, cph_bit) = match mode {
@@ -404,6 +409,7 @@ macro_rules! spi {
                             spi,
                             cfg: spi_cfg,
                             sys_clk,
+                            blockmode: init_blockmode,
                             _word: PhantomData,
                         },
                         pins,
@@ -470,6 +476,7 @@ macro_rules! spi {
                 pub fn cfg_transfer<HwCs: OptionalHwCs<$SPIX>>(&mut self, transfer_cfg: &TransferConfig<HwCs>) {
                     self.cfg_clock(transfer_cfg.spi_clk);
                     self.cfg_mode(transfer_cfg.mode);
+                    self.blockmode = transfer_cfg.blockmode;
                     self.spi.ctrl1.modify(|_, w| {
                         if transfer_cfg.sod {
                             w.sod().set_bit();
@@ -491,7 +498,7 @@ macro_rules! spi {
                 }
             }
 
-            // Changing the word size also requires a type conversion
+            /// Changing the word size also requires a type conversion
             impl <Sck: PinSck<$SPIX>, Miso: PinMiso<$SPIX>, Mosi: PinMosi<$SPIX>>
                 From<Spi<$SPIX, (Sck, Miso, Mosi), u8>> for Spi<$SPIX, (Sck, Miso, Mosi), u16>
             {
@@ -507,6 +514,7 @@ macro_rules! spi {
                         spi_base: SpiBase {
                             spi: old_spi.spi_base.spi,
                             cfg: old_spi.spi_base.cfg,
+                            blockmode: old_spi.spi_base.blockmode,
                             sys_clk: old_spi.spi_base.sys_clk,
                             _word: PhantomData,
                         },
@@ -515,7 +523,7 @@ macro_rules! spi {
                 }
             }
 
-            // Changing the word size also requires a type conversion
+            /// Changing the word size also requires a type conversion
             impl <Sck: PinSck<$SPIX>, Miso: PinMiso<$SPIX>, Mosi: PinMosi<$SPIX>>
                 From<Spi<$SPIX, (Sck, Miso, Mosi), u16>> for
                 Spi<$SPIX, (Sck, Miso, Mosi), u8>
@@ -532,6 +540,7 @@ macro_rules! spi {
                         spi_base: SpiBase {
                             spi: old_spi.spi_base.spi,
                             cfg: old_spi.spi_base.cfg,
+                            blockmode: old_spi.spi_base.blockmode,
                             sys_clk: old_spi.spi_base.sys_clk,
                             _word: PhantomData,
                         },
@@ -546,15 +555,6 @@ macro_rules! spi {
                 {
                     type Error = Infallible;
 
-                    /// Read a word from the slave. Must be preceeded by a [`send`] call
-                    #[inline(always)]
-                    fn read(&mut self) -> nb::Result<$WORD, Self::Error> {
-                        if self.spi.status.read().rne().bit_is_clear() {
-                            return Err(nb::Error::WouldBlock);
-                        }
-                        Ok((self.spi.data.read().bits() & 0xffff) as $WORD)
-                    }
-
                     /// Sends a word to the slave
                     #[inline(always)]
                     fn send(&mut self, word: $WORD) -> nb::Result<(), Self::Error> {
@@ -563,6 +563,15 @@ macro_rules! spi {
                         }
                         self.spi.data.write(|w| unsafe { w.bits(word as u32) });
                         Ok(())
+                    }
+
+                    /// Read a word from the slave. Must be preceeded by a [`send`](Self::send) call
+                    #[inline(always)]
+                    fn read(&mut self) -> nb::Result<$WORD, Self::Error> {
+                        if self.spi.status.read().rne().bit_is_clear() {
+                            return Err(nb::Error::WouldBlock);
+                        }
+                        Ok((self.spi.data.read().bits() & 0xffff) as $WORD)
                     }
                 }
 
@@ -592,14 +601,24 @@ macro_rules! spi {
                         write_words: &'w [$WORD],
                         read_words: Option<&'w mut [$WORD]>,
                     ) -> Result<(), Infallible> {
-                        // FIFO has a depth of 16. Only fill the first half for now
-                        const FIFO_WORDS: usize = 8;
+                        // FIFO has a depth of 16.
+                        const FIFO_WORDS: usize = 12;
 
+                        if self.blockmode {
+                            self.spi.ctrl1.modify(|_, w| {
+                                w.mtxpause().set_bit()
+                            })
+                        }
                         // Fill the first half of the write FIFO
                         let len = write_words.len();
                         let mut write = write_words.iter();
                         for _ in 0..core::cmp::min(FIFO_WORDS, len) {
                             nb::block!(self.send(*write.next().unwrap())).ok().unwrap();
+                        }
+                        if self.blockmode {
+                            self.spi.ctrl1.modify(|_, w| {
+                                w.mtxpause().clear_bit()
+                            })
                         }
                         if let Some(read) = read_words {
                             let mut read = read.iter_mut();
