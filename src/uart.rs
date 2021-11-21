@@ -46,7 +46,7 @@ pub enum Error {
     BreakCondition,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Event {
     // Receiver FIFO interrupt enable. Generates interrupt
     // when FIFO is at least half full. Half full is defined as FIFO
