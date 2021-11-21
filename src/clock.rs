@@ -40,9 +40,9 @@ pub enum FilterClkSel {
 /// The Vorago in powered by an external clock which might have different frequencies.
 /// The clock can be set here so it can be used by other software components as well.
 /// The clock can be set exactly once
-pub fn set_sys_clock(freq: Hertz) {
+pub fn set_sys_clock(freq: impl Into<Hertz>) {
     interrupt::free(|cs| {
-        SYS_CLOCK.borrow(cs).set(freq).ok();
+        SYS_CLOCK.borrow(cs).set(freq.into()).ok();
     })
 }
 

@@ -62,10 +62,10 @@ fn main() -> ! {
                 pinsa.pa29.into_funsel_1(),
             );
             spia_ref.borrow_mut().replace(
-                Spi::spia::<NoneT>(
+                Spi::spia(
                     dp.SPIA,
                     (sck, miso, mosi),
-                    50.mhz().into(),
+                    50.mhz(),
                     spi_cfg,
                     Some(&mut dp.SYSCONFIG),
                     None,
@@ -80,10 +80,10 @@ fn main() -> ! {
                 pinsb.pb7.into_funsel_2(),
             );
             spia_ref.borrow_mut().replace(
-                Spi::spia::<NoneT>(
+                Spi::spia(
                     dp.SPIA,
                     (sck, miso, mosi),
-                    50.mhz().into(),
+                    50.mhz(),
                     spi_cfg,
                     Some(&mut dp.SYSCONFIG),
                     None,
@@ -98,10 +98,10 @@ fn main() -> ! {
                 pinsb.pb3.into_funsel_1(),
             );
             spib_ref.borrow_mut().replace(
-                Spi::spib::<NoneT>(
+                Spi::spib(
                     dp.SPIB,
                     (sck, miso, mosi),
-                    50.mhz().into(),
+                    50.mhz(),
                     spi_cfg,
                     Some(&mut dp.SYSCONFIG),
                     None,
@@ -114,10 +114,9 @@ fn main() -> ! {
     match SPI_BUS_SEL {
         SpiBusSelect::SpiAPortA | SpiBusSelect::SpiAPortB => {
             if let Some(ref mut spi) = *spia_ref.borrow_mut() {
-                let transfer_cfg = TransferConfig::<NoneT>::new(
+                let transfer_cfg = TransferConfig::new_no_hw_cs(
                     SPI_SPEED_KHZ.khz().into(),
                     SPI_MODE,
-                    None,
                     BLOCKMODE,
                     false,
                 );

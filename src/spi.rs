@@ -54,25 +54,27 @@ pub trait PinSck<SPI>: Sealed {}
 pub trait PinMosi<SPI>: Sealed {}
 pub trait PinMiso<SPI>: Sealed {}
 
-pub trait OptionalHwCs<SPI>: Sealed {
+pub trait HwCs: Sealed {
     const CS_ID: HwChipSelectId;
 }
+pub trait OptionalHwCs<SPI>: HwCs + Sealed {}
 
 macro_rules! hw_cs_pin {
     ($SPIx:ident, $PXx:ident, $AFx:ident, $HwCsIdent:path, $typedef:ident) => {
-        impl OptionalHwCs<$SPIx> for Pin<$PXx, $AFx> {
+        impl HwCs for Pin<$PXx, $AFx> {
             const CS_ID: HwChipSelectId = $HwCsIdent;
         }
+        impl OptionalHwCs<$SPIx> for Pin<$PXx, $AFx> {}
         pub type $typedef = Pin<$PXx, $AFx>;
     };
 }
 
-impl OptionalHwCs<SPIA> for NoneT {
+impl HwCs for NoneT {
     const CS_ID: HwChipSelectId = HwChipSelectId::Invalid;
 }
-impl OptionalHwCs<SPIB> for NoneT {
-    const CS_ID: HwChipSelectId = HwChipSelectId::Invalid;
-}
+
+impl OptionalHwCs<SPIA> for NoneT {}
+impl OptionalHwCs<SPIB> for NoneT {}
 
 // SPIA
 
@@ -183,6 +185,7 @@ pub trait GenericTransferConfig {
     fn blockmode(&mut self, blockmode: bool);
     fn mode(&mut self, mode: Mode);
     fn frequency(&mut self, spi_clk: Hertz);
+    fn hw_cs_id(&self) -> u8;
 }
 
 /// This struct contains all configuration parameter which are transfer specific
@@ -201,7 +204,32 @@ pub struct TransferConfig<HWCS> {
     pub blockmode: bool,
 }
 
-impl<HWCS> TransferConfig<HWCS> {
+/// Type erased variant of the transfer configuration. This is required to avoid generics in
+/// the SPI constructor.
+pub struct ReducedTransferConfig {
+    pub spi_clk: Hertz,
+    pub mode: Mode,
+    pub sod: bool,
+    /// If this is enabled, all data in the FIFO is transmitted in a single frame unless
+    /// the BMSTOP bit is set on a dataword. A frame is defined as CSn being active for the
+    /// duration of multiple data words
+    pub blockmode: bool,
+    pub hw_cs: HwChipSelectId,
+}
+
+impl TransferConfig<NoneT> {
+    pub fn new_no_hw_cs(spi_clk: Hertz, mode: Mode, blockmode: bool, sod: bool) -> Self {
+        TransferConfig {
+            spi_clk,
+            mode,
+            hw_cs: None,
+            sod,
+            blockmode,
+        }
+    }
+}
+
+impl<HWCS: HwCs> TransferConfig<HWCS> {
     pub fn new(
         spi_clk: Hertz,
         mode: Mode,
@@ -217,9 +245,19 @@ impl<HWCS> TransferConfig<HWCS> {
             blockmode,
         }
     }
+
+    pub fn downgrade(self) -> ReducedTransferConfig {
+        ReducedTransferConfig {
+            spi_clk: self.spi_clk,
+            mode: self.mode,
+            sod: self.sod,
+            blockmode: self.blockmode,
+            hw_cs: HWCS::CS_ID,
+        }
+    }
 }
 
-impl<HWCS> GenericTransferConfig for TransferConfig<HWCS> {
+impl<HWCS: HwCs> GenericTransferConfig for TransferConfig<HWCS> {
     /// Slave Output Disable
     fn sod(&mut self, sod: bool) {
         self.sod = sod;
@@ -235,6 +273,10 @@ impl<HWCS> GenericTransferConfig for TransferConfig<HWCS> {
 
     fn frequency(&mut self, spi_clk: Hertz) {
         self.spi_clk = spi_clk;
+    }
+
+    fn hw_cs_id(&self) -> u8 {
+        HWCS::CS_ID as u8
     }
 }
 
@@ -341,13 +383,13 @@ macro_rules! spi {
                 ///     If only one device is connected, this configuration only needs to be done
                 ///     once.
                 /// * `syscfg` - Can be passed optionally to enable the peripheral clock
-                pub fn $spix<HwCs: OptionalHwCs<$SPIX>>(
+                pub fn $spix(
                     spi: $SPIX,
                     pins: (Sck, Miso, Mosi),
-                    sys_clk: Hertz,
+                    sys_clk: impl Into<Hertz> + Copy,
                     spi_cfg: SpiConfig,
                     syscfg: Option<&mut SYSCONFIG>,
-                    transfer_cfg: Option<&TransferConfig<HwCs>>,
+                    transfer_cfg: Option<&ReducedTransferConfig>,
                 ) -> Self {
                     if let Some(syscfg) = syscfg {
                         enable_peripheral_clock(syscfg, $clk_enb);
@@ -365,9 +407,9 @@ macro_rules! spi {
                     let mut init_blockmode = false;
                     if let Some(transfer_cfg) = transfer_cfg {
                         mode = transfer_cfg.mode;
-                        clk_prescale = sys_clk.0 / (transfer_cfg.spi_clk.0 * (scrdv as u32 + 1));
-                        if  transfer_cfg.hw_cs.is_some() {
-                            ss = HwCs::CS_ID as u8;
+                        clk_prescale = sys_clk.into().0 / (transfer_cfg.spi_clk.0 * (scrdv as u32 + 1));
+                        if  transfer_cfg.hw_cs != HwChipSelectId::Invalid {
+                            ss = transfer_cfg.hw_cs as u8;
                         }
                         init_blockmode = transfer_cfg.blockmode;
                     }
@@ -408,7 +450,7 @@ macro_rules! spi {
                         spi_base: SpiBase {
                             spi,
                             cfg: spi_cfg,
-                            sys_clk,
+                            sys_clk: sys_clk.into(),
                             blockmode: init_blockmode,
                             _word: PhantomData,
                         },
