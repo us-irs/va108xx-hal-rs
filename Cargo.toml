@@ -1,6 +1,6 @@
 [package]
 name = "va108xx-hal"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
 edition = "2021"
 description = "HAL for the Vorago VA108xx family of microcontrollers"
@@ -21,7 +21,7 @@ once_cell = { version = "1.8.0", default-features = false }
 libm = "0.2.1"
 
 [dependencies.va108xx]
-version = "0.1"
+version = "0.1.3"
 
 [features]
 rt = ["va108xx/rt"]

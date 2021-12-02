@@ -29,7 +29,7 @@ fn main() -> ! {
     let mut dp = pac::Peripherals::take().unwrap();
     let mut last_ms = 0;
     rprintln!("-- Vorago system ticks using timers --");
-    set_sys_clock(50.mhz().into());
+    set_sys_clock(50.mhz());
     let lib_type = LibType::Hal;
     match lib_type {
         LibType::Pac => {

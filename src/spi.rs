@@ -637,7 +637,7 @@ macro_rules! spi {
                         read_words: Option<&'w mut [$WORD]>,
                     ) -> Result<(), Infallible> {
                         // FIFO has a depth of 16.
-                        const FIFO_WORDS: usize = 12;
+                        const FILL_DEPTH: usize = 12;
 
                         if self.blockmode {
                             self.spi.ctrl1.modify(|_, w| {
@@ -647,7 +647,7 @@ macro_rules! spi {
                         // Fill the first half of the write FIFO
                         let len = write_words.len();
                         let mut write = write_words.iter();
-                        for _ in 0..core::cmp::min(FIFO_WORDS, len) {
+                        for _ in 0..core::cmp::min(FILL_DEPTH, len) {
                             nb::block!(self.send(*write.next().unwrap())).ok().unwrap();
                         }
                         if self.blockmode {
@@ -676,7 +676,7 @@ macro_rules! spi {
                             }
 
                             // Dummy read from the read FIFO
-                            for _ in 0..core::cmp::min(FIFO_WORDS, len) {
+                            for _ in 0..core::cmp::min(FILL_DEPTH, len) {
                                 let _ = nb::block!(self.read()).ok().unwrap();
                             }
                         }
