@@ -5,6 +5,7 @@ pub use va108xx as pac;
 
 pub mod clock;
 pub mod gpio;
+pub mod i2c;
 pub mod prelude;
 pub mod spi;
 pub mod time;

@@ -12,7 +12,7 @@ use va108xx_hal::{
     gpio::{PinsA, PinsB},
     pac::{self, SPIA, SPIB},
     prelude::*,
-    spi::{self, NoneT, Spi, SpiBase, TransferConfig},
+    spi::{self, Spi, SpiBase, TransferConfig},
     timer::CountDownTimer,
 };
 
