@@ -26,16 +26,17 @@
 //! }
 //! ```
 //!
-//! A `PinId` identifies a pin by it's group (A, B) and pin number. Each
-//! `PinId` instance is named according to its datasheet identifier, e.g.
-//! [`PA02`].
+//! A [`PinId`] identifies a pin by it's group (A, B) and pin number. Each
+//! [`PinId`] instance is named according to its datasheet identifier, e.g.
+//! PA02.
 //!
 //! A `PinMode` represents the various pin modes. The available `PinMode`
 //! variants are [`Input`], [`Output`] and [`Alternate`], each with its own corresponding
 //! configurations.
 //!
 //! It is not possible for users to create new instances of a [`Pin`]. Singleton
-//! instances of each pin are made available to users through the [`Pins`]
+//! instances of each pin are made available to users through the [`PinsA`] and
+//! [`PinsB`]
 //! struct.
 //!
 //! To create the [`PinsA`] or [`PinsB`] struct, users must supply the PAC
@@ -84,7 +85,8 @@
 //! This module also provides additional, type-level tools to work with GPIO
 //! pins.
 //!
-//! The [`AnyPin`] trait defines an [`AnyKind`] type class
+//! The [`AnyPin`] trait defines an
+//! [`AnyKind`](https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/typelevel/index.html) type class
 //! for all `Pin` types.
 
 use super::dynpins::{DynAlternate, DynGroup, DynInput, DynOutput, DynPinId, DynPinMode};
@@ -229,7 +231,8 @@ impl OutputConfig for ReadableOpenDrain {
 
 /// Type-level variant of [`PinMode`] for output modes
 ///
-/// Type `C` is one of two output configurations: [`PushPull`] or [`Readable`]
+/// Type `C` is one of four output configurations: [`PushPull`], [`OpenDrain`] or
+/// their respective readable versions
 pub struct Output<C: OutputConfig> {
     cfg: PhantomData<C>,
 }
@@ -543,7 +546,8 @@ pub type SpecificPin<P> = Pin<<P as AnyPin>::Id, <P as AnyPin>::Mode>;
 
 /// Type class for [`Pin`] types
 ///
-/// This trait uses the [`AnyKind`] trait pattern to create a [type class] for
+/// This trait uses the [`AnyKind`](https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/typelevel/index.html)
+/// trait pattern to create a [type class] for
 /// [`Pin`] types. See the `AnyKind` documentation for more details on the
 /// pattern.
 pub trait AnyPin: Is<Type = SpecificPin<Self>> {

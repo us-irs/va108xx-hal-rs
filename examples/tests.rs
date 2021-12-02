@@ -9,7 +9,13 @@ use cortex_m_rt::entry;
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
 use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
-use va108xx_hal::gpio::{PinState, PinsA, PinsB};
+use va108xx_hal::{
+    gpio::{PinState, PinsA, PinsB},
+    pac::{self, interrupt},
+    prelude::*,
+    time::Hertz,
+    timer::{default_ms_irq_handler, set_up_ms_timer, CountDownTimer, Delay},
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -25,7 +31,8 @@ enum TestCase {
     // Tie PA0 to an oscilloscope and configure pulse detection
     Pulse,
     // Tie PA0, PA1 and PA3 to an oscilloscope
-    Delay,
+    DelayGpio,
+    DelayMs,
 }
 
 #[entry]
@@ -33,10 +40,11 @@ fn main() -> ! {
     rtt_init_print!();
     rprintln!("-- VA108xx Test Application --");
     let mut dp = va108xx::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
     let pinsa = PinsA::new(&mut dp.SYSCONFIG, None, dp.PORTA);
     let pinsb = PinsB::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTB);
     let mut led1 = pinsa.pa10.into_push_pull_output();
-    let test_case = TestCase::Delay;
+    let test_case = TestCase::DelayGpio;
 
     match test_case {
         TestCase::TestBasic
@@ -125,7 +133,7 @@ fn main() -> ! {
                 cortex_m::asm::delay(25_000_000);
             }
         }
-        TestCase::Delay => {
+        TestCase::DelayGpio => {
             let mut out_0 = pinsa.pa0.into_push_pull_output().delay(true, false);
             let mut out_1 = pinsa.pa1.into_push_pull_output().delay(false, true);
             let mut out_2 = pinsa.pa3.into_push_pull_output().delay(true, true);
@@ -136,6 +144,47 @@ fn main() -> ! {
                 cortex_m::asm::delay(25_000_000);
             }
         }
+        TestCase::DelayMs => {
+            let ms_timer = set_up_ms_timer(
+                &mut dp.SYSCONFIG,
+                &mut dp.IRQSEL,
+                50.mhz().into(),
+                dp.TIM0,
+                pac::Interrupt::OC0,
+            );
+            unsafe {
+                cortex_m::peripheral::NVIC::unmask(pac::Interrupt::OC0);
+            }
+            let mut delay = Delay::new(ms_timer);
+            for _ in 0..5 {
+                led1.toggle().ok();
+                delay.delay_ms(500);
+                led1.toggle().ok();
+                delay.delay_ms(500);
+            }
+
+            let mut delay_timer = CountDownTimer::tim1(&mut dp.SYSCONFIG, 50.mhz().into(), dp.TIM1);
+            let mut pa0 = pinsa.pa0.into_push_pull_output();
+            for _ in 0..5 {
+                led1.toggle().ok();
+                delay_timer.delay_ms(200_u32);
+                led1.toggle().ok();
+                delay_timer.delay_ms(200_u32);
+            }
+            let ahb_freq: Hertz = 50.mhz().into();
+            let mut syst_delay = cortex_m::delay::Delay::new(cp.SYST, ahb_freq.0);
+            // Test usecond delay using both TIM peripheral and SYST
+            loop {
+                pa0.toggle().ok();
+                delay_timer.delay_us(50_u32);
+                pa0.toggle().ok();
+                delay_timer.delay_us(50_u32);
+                pa0.toggle().ok();
+                syst_delay.delay_us(50);
+                pa0.toggle().ok();
+                syst_delay.delay_us(50);
+            }
+        }
     }
 
     rprintln!("Test success");
@@ -143,4 +192,9 @@ fn main() -> ! {
         led1.toggle().ok();
         cortex_m::asm::delay(25_000_000);
     }
+}
+
+#[interrupt]
+fn OC0() {
+    default_ms_irq_handler()
 }

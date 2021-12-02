@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+### Added
+
+- DelayUs and DelayMs trait implementations for timer
+- SPI implementation for blocking API, supports blockmode as well
+
+### Changed
+
+- API which expects values in Hertz now uses `impl Into<Hertz>` as input parameter
+
 ## [0.2.1]
 
 ### Added

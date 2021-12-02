@@ -3,8 +3,8 @@
 //! The implementation of this GPIO module is heavily based on the
 //! [ATSAMD HAL implementation](https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/gpio/v2/index.html).
 //!
-//! This API provides two different submodules, [`pins`] and [`dynpins`],
-//! representing two different ways to handle GPIO pins. The default, [`pins`],
+//! This API provides two different submodules, [`mod@pins`] and [`dynpins`],
+//! representing two different ways to handle GPIO pins. The default, [`mod@pins`],
 //! is a type-level API that tracks the state of each pin at compile-time. The
 //! alternative, [`dynpins`] is a type-erased, value-level API that tracks the
 //! state of each pin at run-time.

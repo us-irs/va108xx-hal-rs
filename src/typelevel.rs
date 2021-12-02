@@ -12,8 +12,8 @@ impl Sealed for NoneT {}
 
 /// Marker trait for type identity
 ///
-/// This trait is used as part of the [`AnyKind`] trait pattern. It represents
-/// the concept of type identity, because all implementors have
+/// This trait is used as part of the [`AnyKind`](https://docs.rs/atsamd-hal/0.13.0/atsamd_hal/typelevel/index.html)
+/// trait pattern. It represents the concept of type identity, because all implementors have
 /// `<Self as Is>::Type == Self`. When used as a trait bound with a specific
 /// type, it guarantees that the corresponding type parameter is exactly the
 /// specific type. Stated differently, it guarantees that `T == Specific` in

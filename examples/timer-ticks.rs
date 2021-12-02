@@ -12,7 +12,7 @@ use va108xx_hal::{
     pac::{self, interrupt},
     prelude::*,
     time::Hertz,
-    timer::{set_up_ms_timer, CountDownTimer, Event},
+    timer::{default_ms_irq_handler, set_up_ms_timer, CountDownTimer, Event, MS_COUNTER},
 };
 
 #[allow(dead_code)]
@@ -21,7 +21,6 @@ enum LibType {
     Hal,
 }
 
-static MS_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 static SEC_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
 #[entry]
@@ -105,11 +104,7 @@ fn unmask_irqs() {
 
 #[interrupt]
 fn OC0() {
-    cortex_m::interrupt::free(|cs| {
-        let mut ms = MS_COUNTER.borrow(cs).get();
-        ms += 1;
-        MS_COUNTER.borrow(cs).set(ms);
-    });
+    default_ms_irq_handler()
 }
 
 #[interrupt]
