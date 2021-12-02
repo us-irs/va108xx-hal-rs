@@ -48,7 +48,7 @@
 //!
 //! ```
 //! let mut peripherals = Peripherals::take().unwrap();
-//! let pins = Pins::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTA);
+//! let pins = PinsA::new(&mut dp.SYSCONFIG, Some(dp.IOCONFIG), dp.PORTA);
 //! ```
 //!
 //! Pins can be converted between modes using several different methods.
