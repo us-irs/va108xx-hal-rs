@@ -11,8 +11,10 @@ use crate::{
 };
 use core::marker::PhantomData;
 use embedded_hal::blocking::i2c::{
-    Read, SevenBitAddress, TenBitAddress, Write, WriteIter, WriteIterRead, WriteRead,
+    Read, Write, WriteIter, WriteIterRead, WriteRead,
 };
+
+pub use embedded_hal::blocking::i2c::{SevenBitAddress, TenBitAddress};
 
 //==================================================================================================
 // Defintions
