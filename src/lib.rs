@@ -12,6 +12,7 @@ pub mod time;
 pub mod timer;
 pub mod typelevel;
 pub mod uart;
+pub mod utility;
 
 mod private {
     /// Super trait used to mark traits with an exhaustive set of
