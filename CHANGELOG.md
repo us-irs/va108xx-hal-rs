@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+### Added
+
+- Basic API for EDAC functionality
+
 ## [0.2.2]
 
 ### Added
