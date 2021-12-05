@@ -731,7 +731,7 @@ impl<I: PinId> InputPin for Pin<I, OutputReadablePushPull> {
 /// Provide a safe register interface for [`Pin`]s
 ///
 /// This `struct` takes ownership of a [`PinId`] and provides an API to
-/// access the corresponding regsiters.
+/// access the corresponding registers.
 pub(in crate::gpio) struct Registers<I: PinId> {
     id: PhantomData<I>,
 }
