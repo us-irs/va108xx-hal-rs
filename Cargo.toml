@@ -1,6 +1,6 @@
 [package]
 name = "va108xx-hal"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
 edition = "2021"
 description = "HAL for the Vorago VA108xx family of microcontrollers"

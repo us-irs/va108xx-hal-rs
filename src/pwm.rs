@@ -41,7 +41,7 @@ macro_rules! pwm_common_func {
         #[inline]
         fn enable_pwm_a(&mut self) {
             self.reg
-                .get_reg_block()
+                .reg()
                 .ctrl
                 .modify(|_, w| unsafe { w.status_sel().bits(StatusSelPwm::PwmA as u8) });
         }
@@ -49,7 +49,7 @@ macro_rules! pwm_common_func {
         #[inline]
         fn enable_pwm_b(&mut self) {
             self.reg
-                .get_reg_block()
+                .reg()
                 .ctrl
                 .modify(|_, w| unsafe { w.status_sel().bits(StatusSelPwm::PwmB as u8) });
         }
@@ -69,7 +69,7 @@ macro_rules! pwm_common_func {
             self.pwm_base.current_rst_val =
                 self.pwm_base.sys_clk.0 / self.pwm_base.current_period.0;
             self.reg
-                .get_reg_block()
+                .reg()
                 .rst_value
                 .write(|w| unsafe { w.bits(self.pwm_base.current_rst_val) });
         }
@@ -98,7 +98,7 @@ macro_rules! pwmb_func {
                 * self.pwm_base.current_lower_limit as u64)
                 / DUTY_MAX as u64;
             self.reg
-                .get_reg_block()
+                .reg()
                 .pwmb_value
                 .write(|w| unsafe { w.bits(pwmb_val as u32) });
         }
@@ -115,7 +115,7 @@ macro_rules! pwmb_func {
                 * self.pwm_base.current_duty as u64)
                 / DUTY_MAX as u64;
             self.reg
-                .get_reg_block()
+                .reg()
                 .pwma_value()
                 .write(|w| unsafe { w.bits(pwma_val as u32) });
         }
@@ -127,7 +127,7 @@ macro_rules! pwmb_func {
 //==================================================================================================
 
 pub struct PwmPin<PIN: TimPin, TIM: ValidTim, MODE = PWMA> {
-    reg: TimRegister<PIN, TIM>,
+    reg: TimAndPinRegister<PIN, TIM>,
     pwm_base: PwmBase,
     _mode: PhantomData<MODE>,
 }
@@ -151,7 +151,7 @@ where
                 current_rst_val: 0,
                 sys_clk: sys_clk.into(),
             },
-            reg: unsafe { TimRegister::new(vtp.0, vtp.1) },
+            reg: unsafe { TimAndPinRegister::new(vtp.0, vtp.1) },
             _mode: PhantomData,
         };
         enable_peripheral_clock(sys_cfg, crate::clock::PeripheralClocks::Gpio);
@@ -308,18 +308,12 @@ macro_rules! pwm_pin_impl {
     () => {
         #[inline]
         fn disable(&mut self) {
-            self.reg
-                .get_reg_block()
-                .ctrl
-                .modify(|_, w| w.enable().clear_bit());
+            self.reg.reg().ctrl.modify(|_, w| w.enable().clear_bit());
         }
 
         #[inline]
         fn enable(&mut self) {
-            self.reg
-                .get_reg_block()
-                .ctrl
-                .modify(|_, w| w.enable().set_bit());
+            self.reg.reg().ctrl.modify(|_, w| w.enable().set_bit());
         }
 
         #[inline]
@@ -329,7 +323,7 @@ macro_rules! pwm_pin_impl {
                 * (DUTY_MAX as u64 - self.pwm_base.current_duty as u64))
                 / DUTY_MAX as u64;
             self.reg
-                .get_reg_block()
+                .reg()
                 .pwma_value()
                 .write(|w| unsafe { w.bits(pwma_val as u32) });
         }
@@ -350,18 +344,12 @@ macro_rules! pwm_impl {
     () => {
         #[inline]
         fn disable(&mut self, _channel: Self::Channel) {
-            self.reg
-                .get_reg_block()
-                .ctrl
-                .modify(|_, w| w.enable().clear_bit());
+            self.reg.reg().ctrl.modify(|_, w| w.enable().clear_bit());
         }
 
         #[inline]
         fn enable(&mut self, _channel: Self::Channel) {
-            self.reg
-                .get_reg_block()
-                .ctrl
-                .modify(|_, w| w.enable().set_bit());
+            self.reg.reg().ctrl.modify(|_, w| w.enable().set_bit());
         }
 
         #[inline]
@@ -376,7 +364,7 @@ macro_rules! pwm_impl {
                 * (DUTY_MAX as u64 - self.pwm_base.current_duty as u64))
                 / DUTY_MAX as u64;
             self.reg
-                .get_reg_block()
+                .reg()
                 .pwma_value()
                 .write(|w| unsafe { w.bits(pwma_val as u32) });
         }
@@ -393,7 +381,7 @@ macro_rules! pwm_impl {
             }
             self.pwm_base.current_rst_val =
                 self.pwm_base.sys_clk.0 / self.pwm_base.current_period.0;
-            let reg_block = self.reg.get_reg_block();
+            let reg_block = self.reg.reg();
             reg_block
                 .rst_value
                 .write(|w| unsafe { w.bits(self.pwm_base.current_rst_val) });

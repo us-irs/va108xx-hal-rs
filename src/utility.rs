@@ -10,6 +10,23 @@ pub enum UtilityError {
     InvalidCounterResetVal,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum PeripheralSelect {
+    PortA = 0,
+    PortB = 1,
+    Spi0 = 4,
+    Spi1 = 5,
+    Spi2 = 6,
+    Uart0 = 8,
+    Uart1 = 9,
+    I2c0 = 16,
+    I2c1 = 17,
+    Irqsel = 21,
+    Ioconfig = 22,
+    Utility = 23,
+    Gpio = 24,
+}
+
 /// Enable scrubbing for the ROM
 ///
 /// Returns [`UtilityError::InvalidCounterResetVal`] if the scrub rate is 0
@@ -40,4 +57,18 @@ pub fn enable_ram_scrubbing(syscfg: &mut SYSCONFIG, scrub_rate: u32) -> Result<(
 
 pub fn disable_ram_scrubbing(syscfg: &mut SYSCONFIG) {
     syscfg.ram_scrub.write(|w| unsafe { w.bits(0) })
+}
+
+/// Clear the reset bit. This register is active low, so doing this will hold the peripheral
+/// in a reset state
+pub fn clear_reset_bit(syscfg: &mut SYSCONFIG, periph_sel: PeripheralSelect) {
+    syscfg
+        .peripheral_reset
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << periph_sel as u8)) });
+}
+
+pub fn set_reset_bit(syscfg: &mut SYSCONFIG, periph_sel: PeripheralSelect) {
+    syscfg
+        .peripheral_reset
+        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << periph_sel as u8)) });
 }

@@ -11,7 +11,10 @@ use crate::{
         PA9, PB0, PB1, PB10, PB11, PB12, PB13, PB14, PB15, PB16, PB17, PB18, PB19, PB2, PB20, PB21,
         PB22, PB23, PB3, PB4, PB5, PB6,
     },
-    pac::{self, tim0},
+    pac::{
+        self, tim0, TIM0, TIM1, TIM10, TIM11, TIM12, TIM13, TIM14, TIM15, TIM16, TIM17, TIM18,
+        TIM19, TIM2, TIM20, TIM21, TIM22, TIM23, TIM3, TIM4, TIM5, TIM6, TIM7, TIM8, TIM9,
+    },
     prelude::*,
     private::Sealed,
     time::Hertz,
@@ -161,7 +164,7 @@ pin_and_tim!(PB1, AltFunc3, 1, TIM1);
 pin_and_tim!(PB0, AltFunc3, 0, TIM0);
 
 //==================================================================================================
-// Register Interface
+// Register Interface for TIM registers and TIM pins
 //==================================================================================================
 
 pub type TimRegBlock = tim0::RegisterBlock;
@@ -173,20 +176,19 @@ pub type TimRegBlock = tim0::RegisterBlock;
 ///
 /// # Safety
 ///
-/// Users should only implement the [`id`] function. No default function
+/// Users should only implement the [`tim_id`] function. No default function
 /// implementations should be overridden. The implementing type must also have
 /// "control" over the corresponding pin ID, i.e. it must guarantee that a each
 /// pin ID is a singleton.
 pub(super) unsafe trait TimRegInterface {
     fn tim_id(&self) -> u8;
-    fn pin_id(&self) -> DynPinId;
 
     const PORT_BASE: *const tim0::RegisterBlock = TIM0::ptr() as *const _;
 
     /// All 24 TIM blocks are identical. This helper functions returns the correct
     /// memory mapped peripheral depending on the TIM ID.
     #[inline(always)]
-    fn get_reg_block(&self) -> &TimRegBlock {
+    fn reg(&self) -> &TimRegBlock {
         unsafe { &*Self::PORT_BASE.offset(self.tim_id() as isize) }
     }
 
@@ -194,24 +196,85 @@ pub(super) unsafe trait TimRegInterface {
     fn mask_32(&self) -> u32 {
         1 << self.tim_id()
     }
+
+    /// Clear the reset bit of the TIM, holding it in reset
+    ///
+    /// # Safety
+    ///
+    /// Only the bit related to the corresponding TIM peripheral is modified
+    #[inline]
+    fn clear_tim_reset_bit(&self) {
+        unsafe {
+            va108xx::Peripherals::steal()
+                .SYSCONFIG
+                .tim_reset
+                .modify(|r, w| w.bits(r.bits() & !self.mask_32()))
+        }
+    }
+
+    #[inline]
+    fn set_tim_reset_bit(&self) {
+        unsafe {
+            va108xx::Peripherals::steal()
+                .SYSCONFIG
+                .tim_reset
+                .modify(|r, w| w.bits(r.bits() | self.mask_32()))
+        }
+    }
+}
+
+/// Register interface.
+///
+/// This interface provides an interface for TIM pins to access their corresponding
+/// configuration
+///
+/// # Safety
+///
+/// Users should only implement the [`pin_id`] function. No default function
+/// implementations should be overridden. The implementing type must also have
+/// "control" over the corresponding pin ID, i.e. it must guarantee that a each
+/// pin ID is a singleton.
+pub(super) unsafe trait TimPinInterface {
+    fn pin_id(&self) -> DynPinId;
 }
 
 /// Provide a safe register interface for [`ValidTimAndPin`]s
 ///
 /// This `struct` takes ownership of a [`ValidTimAndPin`] and provides an API to
 /// access the corresponding registers.
-pub(super) struct TimRegister<PIN: TimPin, TIM: ValidTim> {
+pub(super) struct TimAndPinRegister<PIN: TimPin, TIM: ValidTim> {
     pin: PIN,
     tim: TIM,
 }
 
-impl<PIN: TimPin, TIM: ValidTim> TimRegister<PIN, TIM>
+pub(super) struct TimRegister<TIM: ValidTim> {
+    tim: TIM,
+}
+
+impl<TIM: ValidTim> TimRegister<TIM> {
+    #[inline]
+    pub(super) unsafe fn new(tim: TIM) -> Self {
+        TimRegister { tim }
+    }
+
+    pub(super) fn release(self) -> TIM {
+        self.tim
+    }
+}
+
+unsafe impl<TIM: ValidTim> TimRegInterface for TimRegister<TIM> {
+    fn tim_id(&self) -> u8 {
+        TIM::TIM_ID
+    }
+}
+
+impl<PIN: TimPin, TIM: ValidTim> TimAndPinRegister<PIN, TIM>
 where
     (PIN, TIM): ValidTimAndPin<PIN, TIM>,
 {
     #[inline]
     pub(super) unsafe fn new(pin: PIN, tim: TIM) -> Self {
-        TimRegister { pin, tim }
+        TimAndPinRegister { pin, tim }
     }
 
     pub(super) fn release(self) -> (PIN, TIM) {
@@ -219,12 +282,14 @@ where
     }
 }
 
-unsafe impl<PIN: TimPin, TIM: ValidTim> TimRegInterface for TimRegister<PIN, TIM> {
+unsafe impl<PIN: TimPin, TIM: ValidTim> TimRegInterface for TimAndPinRegister<PIN, TIM> {
     #[inline(always)]
     fn tim_id(&self) -> u8 {
         TIM::TIM_ID
     }
+}
 
+unsafe impl<PIN: TimPin, TIM: ValidTim> TimPinInterface for TimAndPinRegister<PIN, TIM> {
     #[inline(always)]
     fn pin_id(&self) -> DynPinId {
         PIN::DYN
@@ -236,8 +301,8 @@ pub(super) struct TimDynRegister {
     pin_id: DynPinId,
 }
 
-impl<PIN: TimPin, TIM: ValidTim> From<TimRegister<PIN, TIM>> for TimDynRegister {
-    fn from(_reg: TimRegister<PIN, TIM>) -> Self {
+impl<PIN: TimPin, TIM: ValidTim> From<TimAndPinRegister<PIN, TIM>> for TimDynRegister {
+    fn from(_reg: TimAndPinRegister<PIN, TIM>) -> Self {
         Self {
             tim_id: TIM::TIM_ID,
             pin_id: PIN::DYN,
@@ -250,7 +315,9 @@ unsafe impl TimRegInterface for TimDynRegister {
     fn tim_id(&self) -> u8 {
         self.tim_id
     }
+}
 
+unsafe impl TimPinInterface for TimDynRegister {
     #[inline(always)]
     fn pin_id(&self) -> DynPinId {
         self.pin_id
@@ -262,8 +329,8 @@ unsafe impl TimRegInterface for TimDynRegister {
 //==================================================================================================
 
 /// Hardware timers
-pub struct CountDownTimer<TIM> {
-    tim: TIM,
+pub struct CountDownTimer<TIM: ValidTim> {
+    tim: TimRegister<TIM>,
     curr_freq: Hertz,
     sys_clk: Hertz,
     rst_val: u32,
@@ -277,201 +344,201 @@ fn enable_tim_clk(syscfg: &mut SYSCONFIG, idx: u8) {
         .modify(|r, w| unsafe { w.bits(r.bits() | (1 << idx)) });
 }
 
-macro_rules! timers {
-    ($($TIM:ident: ($tim:ident, $i:expr),)+) => {
-        $(
-            use crate::pac::$TIM;
+unsafe impl<TIM: ValidTim> TimRegInterface for CountDownTimer<TIM> {
+    fn tim_id(&self) -> u8 {
+        TIM::TIM_ID
+    }
+}
 
-            impl CountDownTimer<$TIM> {
-                // XXX(why not name this `new`?) bummer: constructors need to have different names
-                // even if the `$TIM` are non overlapping (compare to the `free` function below
-                // which just works)
-                /// Configures a TIM peripheral as a periodic count down timer
-                pub fn $tim(
-                    syscfg: &mut SYSCONFIG, sys_clk: Hertz, tim: $TIM
-                ) -> Self {
-                    enable_tim_clk(syscfg, $i);
-                    tim.ctrl.modify(|_, w| w.enable().set_bit());
-                    CountDownTimer {
-                        tim,
-                        sys_clk,
-                        rst_val: 0,
-                        curr_freq: 0.hz(),
-                        listening: false,
-                        last_cnt: 0,
-                    }
-                }
+impl<TIM: ValidTim> CountDownTimer<TIM> {
+    /// Configures a TIM peripheral as a periodic count down timer
+    pub fn new(syscfg: &mut SYSCONFIG, sys_clk: Hertz, tim: TIM) -> Self {
+        enable_tim_clk(syscfg, TIM::TIM_ID);
+        let cd_timer = CountDownTimer {
+            tim: unsafe { TimRegister::new(tim) },
+            sys_clk,
+            rst_val: 0,
+            curr_freq: 0.hz(),
+            listening: false,
+            last_cnt: 0,
+        };
+        cd_timer.tim.reg().ctrl.modify(|_, w| w.enable().set_bit());
+        cd_timer
+    }
 
-                /// Listen for events. This also actives the IRQ in the IRQSEL register
-                /// for the provided interrupt. It also actives the peripheral clock for
-                /// IRQSEL
-                pub fn listen(
-                    &mut self,
-                    event: Event,
-                    syscfg: &mut SYSCONFIG,
-                    irqsel: &mut IRQSEL,
-                    interrupt: Interrupt,
-                ) {
-                    match event {
-                        Event::TimeOut => {
-                            enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
-                            irqsel.tim[$i].write(|w| unsafe { w.bits(interrupt as u32) });
-                            self.tim.ctrl.modify(|_, w| w.irq_enb().set_bit());
-                            self.listening = true;
-                        }
-                    }
-                }
-
-                pub fn unlisten(
-                    &mut self, event: Event, syscfg: &mut SYSCONFIG, irqsel: &mut IRQSEL
-                ) {
-                    match event {
-                        Event::TimeOut => {
-                            enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
-                            irqsel.tim[$i].write(|w| unsafe { w.bits(IRQ_DST_NONE) });
-                            self.tim.ctrl.modify(|_, w| w.irq_enb().clear_bit());
-                            self.listening = false;
-                        }
-                    }
-                }
-
-                pub fn release(self, syscfg: &mut SYSCONFIG) -> $TIM {
-                    self.tim.ctrl.write(|w| w.enable().clear_bit());
-                    syscfg
-                        .tim_clk_enable
-                        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << $i)) });
-                    self.tim
-                }
-
-                pub fn auto_disable(self, enable: bool) -> Self {
-                    if enable {
-                        self.tim.ctrl.modify(|_, w| w.auto_disable().set_bit());
-                    } else {
-                        self.tim.ctrl.modify(|_, w| w.auto_disable().clear_bit());
-                    }
-                    self
-                }
-
-                pub fn auto_deactivate(self, enable: bool) -> Self {
-                    if enable {
-                        self.tim.ctrl.modify(|_, w| w.auto_deactivate().set_bit());
-                    } else {
-                        self.tim.ctrl.modify(|_, w| w.auto_deactivate().clear_bit());
-                    }
-                    self
-                }
-
-                pub fn curr_freq(&self) -> Hertz {
-                    self.curr_freq
-                }
-
-                pub fn listening(&self) -> bool {
-                    self.listening
-                }
+    /// Listen for events. This also actives the IRQ in the IRQSEL register
+    /// for the provided interrupt. It also actives the peripheral clock for
+    /// IRQSEL
+    pub fn listen(
+        &mut self,
+        event: Event,
+        syscfg: &mut SYSCONFIG,
+        irqsel: &mut IRQSEL,
+        interrupt: Interrupt,
+    ) {
+        match event {
+            Event::TimeOut => {
+                enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
+                irqsel.tim[TIM::TIM_ID as usize].write(|w| unsafe { w.bits(interrupt as u32) });
+                self.tim.reg().ctrl.modify(|_, w| w.irq_enb().set_bit());
+                self.listening = true;
             }
+        }
+    }
 
-            /// CountDown implementation for TIMx
-            impl CountDown for CountDownTimer<$TIM> {
-                type Time = Hertz;
+    pub fn unlisten(&mut self, event: Event, syscfg: &mut SYSCONFIG, irqsel: &mut IRQSEL) {
+        match event {
+            Event::TimeOut => {
+                enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
+                irqsel.tim[TIM::TIM_ID as usize].write(|w| unsafe { w.bits(IRQ_DST_NONE) });
+                self.tim.reg().ctrl.modify(|_, w| w.irq_enb().clear_bit());
+                self.listening = false;
+            }
+        }
+    }
 
-                fn start<T>(&mut self, timeout: T)
-                where
-                    T: Into<Hertz>,
-                {
-                    self.tim.ctrl.modify(|_, w| w.enable().clear_bit());
-                    self.curr_freq = timeout.into();
-                    self.rst_val = self.sys_clk.0 / self.curr_freq.0;
-                    unsafe {
-                        self.tim.rst_value.write(|w| w.bits(self.rst_val));
-                        self.tim.cnt_value.write(|w| w.bits(self.rst_val));
-                    }
-                    self.tim.ctrl.modify(|_, w| w.enable().set_bit());
-                }
+    pub fn release(self, syscfg: &mut SYSCONFIG) -> TIM {
+        self.tim.reg().ctrl.write(|w| w.enable().clear_bit());
+        syscfg
+            .tim_clk_enable
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << TIM::TIM_ID)) });
+        self.tim.release()
+    }
 
-                /// Return `Ok` if the timer has wrapped. Peripheral will automatically clear the
-                /// flag and restart the time if configured correctly
-                fn wait(&mut self) -> nb::Result<(), Void> {
-                    let cnt = self.tim.cnt_value.read().bits();
-                    if cnt > self.last_cnt {
-                        self.last_cnt = self.rst_val;
-                        Ok(())
-                    } else if cnt == 0 {
-                        self.last_cnt = self.rst_val;
-                        Ok(())
-                    } else {
-                        self.last_cnt = cnt;
-                        Err(nb::Error::WouldBlock)
-                    }
-                }
-            }
+    pub fn auto_disable(self, enable: bool) -> Self {
+        if enable {
+            self.tim
+                .reg()
+                .ctrl
+                .modify(|_, w| w.auto_disable().set_bit());
+        } else {
+            self.tim
+                .reg()
+                .ctrl
+                .modify(|_, w| w.auto_disable().clear_bit());
+        }
+        self
+    }
 
-            impl Periodic for CountDownTimer<$TIM> {}
+    pub fn auto_deactivate(self, enable: bool) -> Self {
+        if enable {
+            self.tim
+                .reg()
+                .ctrl
+                .modify(|_, w| w.auto_deactivate().set_bit());
+        } else {
+            self.tim
+                .reg()
+                .ctrl
+                .modify(|_, w| w.auto_deactivate().clear_bit());
+        }
+        self
+    }
 
-            impl Cancel for CountDownTimer<$TIM> {
-                type Error = TimerErrors;
-                fn cancel(&mut self) -> Result<(), Self::Error> {
-                    if !self.tim.ctrl.read().enable().bit_is_set() {
-                        return Err(TimerErrors::Canceled);
-                    }
-                    self.tim.ctrl.write(|w| w.enable().clear_bit());
-                    Ok(())
-                }
-            }
+    pub fn curr_freq(&self) -> Hertz {
+        self.curr_freq
+    }
 
-            /// Delay for microseconds.
-            ///
-            /// For delays less than 100 us, an assembly delay will be used.
-            /// For larger delays, the timer peripheral will be used.
-            /// Please note that the delay using the peripheral might not
-            /// work properly in debug mode.
-            impl delay::DelayUs<u32> for CountDownTimer<$TIM> {
-                fn delay_us(&mut self, us: u32) {
-                    if(us < 100) {
-                       cortex_m::asm::delay(us * (self.sys_clk.0 / 2_000_000));
-                    } else {
-                        // Configuring the peripheral for higher frequencies is unstable
-                        self.start(1000.khz());
-                        // The subtracted value is an empirical value measures by using tests with
-                        // an oscilloscope.
-                        for _ in 0..us - 7 {
-                            nb::block!(self.wait()).unwrap();
-                        }
-                    }
-                }
-            }
-            /// Forwards call to u32 variant of delay
-            impl delay::DelayUs<u16> for CountDownTimer<$TIM> {
-                fn delay_us(&mut self, us: u16) {
-                    self.delay_us(u32::from(us));
-                }
-            }
-            /// Forwards call to u32 variant of delay
-            impl delay::DelayUs<u8> for CountDownTimer<$TIM> {
-                fn delay_us(&mut self, us: u8) {
-                    self.delay_us(u32::from(us));
-                }
-            }
+    pub fn listening(&self) -> bool {
+        self.listening
+    }
+}
 
-            impl delay::DelayMs<u32> for CountDownTimer<$TIM> {
-                fn delay_ms(&mut self, ms: u32) {
-                    self.start(1000.hz());
-                    for _ in 0..ms {
-                        nb::block!(self.wait()).unwrap();
-                    }
-                }
-            }
-            impl delay::DelayMs<u16> for CountDownTimer<$TIM> {
-                fn delay_ms(&mut self, ms: u16) {
-                    self.delay_ms(u32::from(ms));
-                }
-            }
-            impl embedded_hal::blocking::delay::DelayMs<u8> for CountDownTimer<$TIM> {
-                fn delay_ms(&mut self, ms: u8) {
-                    self.delay_ms(u32::from(ms));
-                }
-            }
+/// CountDown implementation for TIMx
+impl<TIM: ValidTim> CountDown for CountDownTimer<TIM> {
+    type Time = Hertz;
 
-        )+
+    fn start<T>(&mut self, timeout: T)
+    where
+        T: Into<Hertz>,
+    {
+        self.tim.reg().ctrl.modify(|_, w| w.enable().clear_bit());
+        self.curr_freq = timeout.into();
+        self.rst_val = self.sys_clk.0 / self.curr_freq.0;
+        unsafe {
+            self.tim.reg().rst_value.write(|w| w.bits(self.rst_val));
+            self.tim.reg().cnt_value.write(|w| w.bits(self.rst_val));
+        }
+        self.tim.reg().ctrl.modify(|_, w| w.enable().set_bit());
+    }
+
+    /// Return `Ok` if the timer has wrapped. Peripheral will automatically clear the
+    /// flag and restart the time if configured correctly
+    fn wait(&mut self) -> nb::Result<(), Void> {
+        let cnt = self.tim.reg().cnt_value.read().bits();
+        if (cnt > self.last_cnt) || cnt == 0 {
+            self.last_cnt = self.rst_val;
+            Ok(())
+        } else {
+            self.last_cnt = cnt;
+            Err(nb::Error::WouldBlock)
+        }
+    }
+}
+
+impl<TIM: ValidTim> Periodic for CountDownTimer<TIM> {}
+
+impl<TIM: ValidTim> Cancel for CountDownTimer<TIM> {
+    type Error = TimerErrors;
+    fn cancel(&mut self) -> Result<(), Self::Error> {
+        if !self.tim.reg().ctrl.read().enable().bit_is_set() {
+            return Err(TimerErrors::Canceled);
+        }
+        self.tim.reg().ctrl.write(|w| w.enable().clear_bit());
+        Ok(())
+    }
+}
+
+/// Delay for microseconds.
+///
+/// For delays less than 100 us, an assembly delay will be used.
+/// For larger delays, the timer peripheral will be used.
+/// Please note that the delay using the peripheral might not
+/// work properly in debug mode.
+impl<TIM: ValidTim> delay::DelayUs<u32> for CountDownTimer<TIM> {
+    fn delay_us(&mut self, us: u32) {
+        if us < 100 {
+            cortex_m::asm::delay(us * (self.sys_clk.0 / 2_000_000));
+        } else {
+            // Configuring the peripheral for higher frequencies is unstable
+            self.start(1000.khz());
+            // The subtracted value is an empirical value measures by using tests with
+            // an oscilloscope.
+            for _ in 0..us - 7 {
+                nb::block!(self.wait()).unwrap();
+            }
+        }
+    }
+}
+/// Forwards call to u32 variant of delay
+impl<TIM: ValidTim> delay::DelayUs<u16> for CountDownTimer<TIM> {
+    fn delay_us(&mut self, us: u16) {
+        self.delay_us(u32::from(us));
+    }
+}
+/// Forwards call to u32 variant of delay
+impl<TIM: ValidTim> delay::DelayUs<u8> for CountDownTimer<TIM> {
+    fn delay_us(&mut self, us: u8) {
+        self.delay_us(u32::from(us));
+    }
+}
+
+impl<TIM: ValidTim> delay::DelayMs<u32> for CountDownTimer<TIM> {
+    fn delay_ms(&mut self, ms: u32) {
+        self.start(1000.hz());
+        for _ in 0..ms {
+            nb::block!(self.wait()).unwrap();
+        }
+    }
+}
+impl<TIM: ValidTim> delay::DelayMs<u16> for CountDownTimer<TIM> {
+    fn delay_ms(&mut self, ms: u16) {
+        self.delay_ms(u32::from(ms));
+    }
+}
+impl<TIM: ValidTim> embedded_hal::blocking::delay::DelayMs<u8> for CountDownTimer<TIM> {
+    fn delay_ms(&mut self, ms: u8) {
+        self.delay_ms(u32::from(ms));
     }
 }
 
@@ -484,7 +551,7 @@ pub fn set_up_ms_timer(
     tim0: TIM0,
     irq: pac::Interrupt,
 ) -> CountDownTimer<TIM0> {
-    let mut ms_timer = CountDownTimer::tim0(syscfg, sys_clk, tim0);
+    let mut ms_timer = CountDownTimer::new(syscfg, sys_clk, tim0);
     ms_timer.listen(timer::Event::TimeOut, syscfg, irqsel, irq);
     ms_timer.start(1000.hz());
     ms_timer
@@ -503,33 +570,6 @@ pub fn default_ms_irq_handler() {
 /// Get the current MS tick count
 pub fn get_ms_ticks() -> u32 {
     cortex_m::interrupt::free(|cs| MS_COUNTER.borrow(cs).get())
-}
-
-timers! {
-    TIM0: (tim0, 0),
-    TIM1: (tim1, 1),
-    TIM2: (tim2, 2),
-    TIM3: (tim3, 3),
-    TIM4: (tim4, 4),
-    TIM5: (tim5, 5),
-    TIM6: (tim6, 6),
-    TIM7: (tim7, 7),
-    TIM8: (tim8, 8),
-    TIM9: (tim9, 9),
-    TIM10: (tim10, 10),
-    TIM11: (tim11, 11),
-    TIM12: (tim12, 12),
-    TIM13: (tim13, 13),
-    TIM14: (tim14, 14),
-    TIM15: (tim15, 15),
-    TIM16: (tim16, 16),
-    TIM17: (tim17, 17),
-    TIM18: (tim18, 18),
-    TIM19: (tim19, 19),
-    TIM20: (tim20, 20),
-    TIM21: (tim21, 21),
-    TIM22: (tim22, 22),
-    TIM23: (tim23, 23),
 }
 
 //==================================================================================================

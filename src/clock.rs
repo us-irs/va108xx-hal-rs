@@ -2,28 +2,14 @@
 //!
 //! This also includes functionality to enable the peripheral clocks
 use crate::time::Hertz;
+use crate::utility::PeripheralSelect;
 use cortex_m::interrupt::{self, Mutex};
 use once_cell::unsync::OnceCell;
 use va108xx::SYSCONFIG;
 
 static SYS_CLOCK: Mutex<OnceCell<Hertz>> = Mutex::new(OnceCell::new());
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum PeripheralClocks {
-    PortA = 0,
-    PortB = 1,
-    Spi0 = 4,
-    Spi1 = 5,
-    Spi2 = 6,
-    Uart0 = 8,
-    Uart1 = 9,
-    I2c0 = 16,
-    I2c1 = 17,
-    Irqsel = 21,
-    Ioconfig = 22,
-    Utility = 23,
-    Gpio = 24,
-}
+pub type PeripheralClocks = PeripheralSelect;
 
 #[derive(Debug, PartialEq)]
 pub enum FilterClkSel {
