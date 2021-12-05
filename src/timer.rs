@@ -5,8 +5,15 @@
 //! - [MS and second tick implementation](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/timer-ticks.rs)
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
-    pac,
+    gpio::{
+        AltFunc1, AltFunc2, AltFunc3, DynPinId, Pin, PinId, PA0, PA1, PA10, PA11, PA12, PA13, PA14,
+        PA15, PA2, PA24, PA25, PA26, PA27, PA28, PA29, PA3, PA30, PA31, PA4, PA5, PA6, PA7, PA8,
+        PA9, PB0, PB1, PB10, PB11, PB12, PB13, PB14, PB15, PB16, PB17, PB18, PB19, PB2, PB20, PB21,
+        PB22, PB23, PB3, PB4, PB5, PB6,
+    },
+    pac::{self, tim0},
     prelude::*,
+    private::Sealed,
     time::Hertz,
     timer,
 };
@@ -22,15 +29,9 @@ use void::Void;
 const IRQ_DST_NONE: u32 = 0xffffffff;
 pub static MS_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
-/// Hardware timers
-pub struct CountDownTimer<TIM> {
-    tim: TIM,
-    curr_freq: Hertz,
-    sys_clk: Hertz,
-    rst_val: u32,
-    last_cnt: u32,
-    listening: bool,
-}
+//==================================================================================================
+// Defintions
+//==================================================================================================
 
 /// Interrupt events
 pub enum Event {
@@ -40,6 +41,234 @@ pub enum Event {
 
 pub enum TimerErrors {
     Canceled,
+}
+
+//==================================================================================================
+// Valid TIM and PIN combinations
+//==================================================================================================
+
+pub trait TimPin {
+    const DYN: DynPinId;
+}
+
+pub trait ValidTim {
+    // TIM ID ranging from 0 to 23 for 24 TIM peripherals
+    const TIM_ID: u8;
+}
+
+macro_rules! tim_marker {
+    ($TIMX:ident, $ID:expr) => {
+        impl ValidTim for $TIMX {
+            const TIM_ID: u8 = $ID;
+        }
+    };
+}
+
+tim_marker!(TIM0, 0);
+tim_marker!(TIM1, 1);
+tim_marker!(TIM2, 2);
+tim_marker!(TIM3, 3);
+tim_marker!(TIM4, 4);
+tim_marker!(TIM5, 5);
+tim_marker!(TIM6, 6);
+tim_marker!(TIM7, 7);
+tim_marker!(TIM8, 8);
+tim_marker!(TIM9, 9);
+tim_marker!(TIM10, 10);
+tim_marker!(TIM11, 11);
+tim_marker!(TIM12, 12);
+tim_marker!(TIM13, 13);
+tim_marker!(TIM14, 14);
+tim_marker!(TIM15, 15);
+tim_marker!(TIM16, 16);
+tim_marker!(TIM17, 17);
+tim_marker!(TIM18, 18);
+tim_marker!(TIM19, 19);
+tim_marker!(TIM20, 20);
+tim_marker!(TIM21, 21);
+tim_marker!(TIM22, 22);
+tim_marker!(TIM23, 23);
+
+pub trait ValidTimAndPin<PIN: TimPin, TIM: ValidTim>: Sealed {}
+
+macro_rules! pin_and_tim {
+    ($PAX:ident, $ALTFUNC:ident, $ID:expr, $TIMX:ident) => {
+        impl TimPin for Pin<$PAX, $ALTFUNC>
+        where
+            $PAX: PinId,
+        {
+            const DYN: DynPinId = $PAX::DYN;
+        }
+
+        impl<PIN: TimPin, TIM: ValidTim> ValidTimAndPin<PIN, TIM> for (Pin<$PAX, $ALTFUNC>, $TIMX)
+        where
+            Pin<$PAX, $ALTFUNC>: TimPin,
+            $PAX: PinId,
+        {
+        }
+
+        impl Sealed for (Pin<$PAX, $ALTFUNC>, $TIMX) {}
+    };
+}
+
+pin_and_tim!(PA31, AltFunc2, 23, TIM23);
+pin_and_tim!(PA30, AltFunc2, 22, TIM22);
+pin_and_tim!(PA29, AltFunc2, 21, TIM21);
+pin_and_tim!(PA28, AltFunc2, 20, TIM20);
+pin_and_tim!(PA27, AltFunc2, 19, TIM19);
+pin_and_tim!(PA26, AltFunc2, 18, TIM18);
+pin_and_tim!(PA25, AltFunc2, 17, TIM17);
+pin_and_tim!(PA24, AltFunc2, 16, TIM16);
+
+pin_and_tim!(PA15, AltFunc1, 15, TIM15);
+pin_and_tim!(PA14, AltFunc1, 14, TIM14);
+pin_and_tim!(PA13, AltFunc1, 13, TIM13);
+pin_and_tim!(PA12, AltFunc1, 12, TIM12);
+pin_and_tim!(PA11, AltFunc1, 11, TIM11);
+pin_and_tim!(PA10, AltFunc1, 10, TIM10);
+pin_and_tim!(PA9, AltFunc1, 9, TIM9);
+pin_and_tim!(PA8, AltFunc1, 8, TIM8);
+pin_and_tim!(PA7, AltFunc1, 7, TIM7);
+pin_and_tim!(PA6, AltFunc1, 6, TIM6);
+pin_and_tim!(PA5, AltFunc1, 5, TIM5);
+pin_and_tim!(PA4, AltFunc1, 4, TIM4);
+pin_and_tim!(PA3, AltFunc1, 3, TIM3);
+pin_and_tim!(PA2, AltFunc1, 2, TIM2);
+pin_and_tim!(PA1, AltFunc1, 1, TIM1);
+pin_and_tim!(PA0, AltFunc1, 0, TIM0);
+
+pin_and_tim!(PB23, AltFunc3, 23, TIM23);
+pin_and_tim!(PB22, AltFunc3, 22, TIM22);
+pin_and_tim!(PB21, AltFunc3, 21, TIM21);
+pin_and_tim!(PB20, AltFunc3, 20, TIM20);
+pin_and_tim!(PB19, AltFunc3, 19, TIM19);
+pin_and_tim!(PB18, AltFunc3, 18, TIM18);
+pin_and_tim!(PB17, AltFunc3, 17, TIM17);
+pin_and_tim!(PB16, AltFunc3, 16, TIM16);
+pin_and_tim!(PB15, AltFunc3, 15, TIM15);
+pin_and_tim!(PB14, AltFunc3, 14, TIM14);
+pin_and_tim!(PB13, AltFunc3, 13, TIM13);
+pin_and_tim!(PB12, AltFunc3, 12, TIM12);
+pin_and_tim!(PB11, AltFunc3, 11, TIM11);
+pin_and_tim!(PB10, AltFunc3, 10, TIM10);
+
+pin_and_tim!(PB6, AltFunc3, 6, TIM6);
+pin_and_tim!(PB5, AltFunc3, 5, TIM5);
+pin_and_tim!(PB4, AltFunc3, 4, TIM4);
+pin_and_tim!(PB3, AltFunc3, 3, TIM3);
+pin_and_tim!(PB2, AltFunc3, 2, TIM2);
+pin_and_tim!(PB1, AltFunc3, 1, TIM1);
+pin_and_tim!(PB0, AltFunc3, 0, TIM0);
+
+//==================================================================================================
+// Register Interface
+//==================================================================================================
+
+pub type TimRegBlock = tim0::RegisterBlock;
+
+/// Register interface.
+///
+/// This interface provides valid TIM pins a way to access their corresponding TIM
+/// registers
+///
+/// # Safety
+///
+/// Users should only implement the [`id`] function. No default function
+/// implementations should be overridden. The implementing type must also have
+/// "control" over the corresponding pin ID, i.e. it must guarantee that a each
+/// pin ID is a singleton.
+pub(super) unsafe trait TimRegInterface {
+    fn tim_id(&self) -> u8;
+    fn pin_id(&self) -> DynPinId;
+
+    const PORT_BASE: *const tim0::RegisterBlock = TIM0::ptr() as *const _;
+
+    /// All 24 TIM blocks are identical. This helper functions returns the correct
+    /// memory mapped peripheral depending on the TIM ID.
+    #[inline(always)]
+    fn get_reg_block(&self) -> &TimRegBlock {
+        unsafe { &*Self::PORT_BASE.offset(self.tim_id() as isize) }
+    }
+
+    #[inline(always)]
+    fn mask_32(&self) -> u32 {
+        1 << self.tim_id()
+    }
+}
+
+/// Provide a safe register interface for [`ValidTimAndPin`]s
+///
+/// This `struct` takes ownership of a [`ValidTimAndPin`] and provides an API to
+/// access the corresponding registers.
+pub(super) struct TimRegister<PIN: TimPin, TIM: ValidTim> {
+    pin: PIN,
+    tim: TIM,
+}
+
+impl<PIN: TimPin, TIM: ValidTim> TimRegister<PIN, TIM>
+where
+    (PIN, TIM): ValidTimAndPin<PIN, TIM>,
+{
+    #[inline]
+    pub(super) unsafe fn new(pin: PIN, tim: TIM) -> Self {
+        TimRegister { pin, tim }
+    }
+
+    pub(super) fn release(self) -> (PIN, TIM) {
+        (self.pin, self.tim)
+    }
+}
+
+unsafe impl<PIN: TimPin, TIM: ValidTim> TimRegInterface for TimRegister<PIN, TIM> {
+    #[inline(always)]
+    fn tim_id(&self) -> u8 {
+        TIM::TIM_ID
+    }
+
+    #[inline(always)]
+    fn pin_id(&self) -> DynPinId {
+        PIN::DYN
+    }
+}
+
+pub(super) struct TimDynRegister {
+    tim_id: u8,
+    pin_id: DynPinId,
+}
+
+impl<PIN: TimPin, TIM: ValidTim> From<TimRegister<PIN, TIM>> for TimDynRegister {
+    fn from(_reg: TimRegister<PIN, TIM>) -> Self {
+        Self {
+            tim_id: TIM::TIM_ID,
+            pin_id: PIN::DYN,
+        }
+    }
+}
+
+unsafe impl TimRegInterface for TimDynRegister {
+    #[inline(always)]
+    fn tim_id(&self) -> u8 {
+        self.tim_id
+    }
+
+    #[inline(always)]
+    fn pin_id(&self) -> DynPinId {
+        self.pin_id
+    }
+}
+
+//==================================================================================================
+// Timers
+//==================================================================================================
+
+/// Hardware timers
+pub struct CountDownTimer<TIM> {
+    tim: TIM,
+    curr_freq: Hertz,
+    sys_clk: Hertz,
+    rst_val: u32,
+    last_cnt: u32,
+    listening: bool,
 }
 
 fn enable_tim_clk(syscfg: &mut SYSCONFIG, idx: u8) {

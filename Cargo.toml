@@ -47,3 +47,7 @@ required-features = ["rt"]
 [[example]]
 name = "tests"
 required-features = ["rt"]
+
+[[example]]
+name = "pwm"
+required-features = ["rt"]

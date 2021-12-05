@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - Basic API for EDAC functionality
+- PWM implementation and example
 
 ## [0.2.2]
 
