@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Basic API for EDAC functionality
 - PWM implementation and example
+- API to perform peripheral resets
 
 ### Changed
 
