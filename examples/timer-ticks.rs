@@ -72,7 +72,7 @@ fn main() -> ! {
                 interrupt::OC0,
             );
             let mut second_timer =
-                CountDownTimer::tim1(&mut dp.SYSCONFIG, get_sys_clock().unwrap(), dp.TIM1);
+                CountDownTimer::new(&mut dp.SYSCONFIG, get_sys_clock().unwrap(), dp.TIM1);
             second_timer.listen(
                 Event::TimeOut,
                 &mut dp.SYSCONFIG,

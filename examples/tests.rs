@@ -163,7 +163,7 @@ fn main() -> ! {
                 delay.delay_ms(500);
             }
 
-            let mut delay_timer = CountDownTimer::tim1(&mut dp.SYSCONFIG, 50.mhz().into(), dp.TIM1);
+            let mut delay_timer = CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz().into(), dp.TIM1);
             let mut pa0 = pinsa.pa0.into_push_pull_output();
             for _ in 0..5 {
                 led1.toggle().ok();
