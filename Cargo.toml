@@ -21,7 +21,7 @@ once_cell = { version = "1.8.0", default-features = false }
 libm = "0.2.1"
 
 [dependencies.va108xx]
-version = "0.1.3"
+version = "0.2.3"
 
 [features]
 rt = ["va108xx/rt"]
