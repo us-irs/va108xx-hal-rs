@@ -59,7 +59,7 @@ your custom board.
 
 The hello world of embedded development is usually to blinky a LED. This example
 is contained within the
-[examples folder](https://github.com/robamu-org/va108xx-hal-rs/tree/main/examples/blinky.rs).
+[examples folder](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/blinky.rs).
 
 1. Set up your Rust cross-compiler if you have not done so yet. See more in the [build chapter](#Building)
 2. Create a new binary crate with `cargo init`
@@ -85,4 +85,4 @@ is contained within the
 
 7. Flashing the board might work differently for different boards and there is usually
    more than one way. You can find example instructions for the REB1 development board
-   [here](https://github.com/robamu/vorago-reb1-rs).
+   [here](https://github.com/robamu-org/vorago-reb1-rs).
