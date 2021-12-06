@@ -139,7 +139,7 @@ fn main() -> ! {
     }
 
     // Application logic
-    let mut delay_tim = CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz().into(), dp.TIM1);
+    let mut delay_tim = CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz(), dp.TIM1);
     loop {
         match SPI_BUS_SEL {
             SpiBusSelect::SpiAPortA | SpiBusSelect::SpiAPortB => {
