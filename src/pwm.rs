@@ -4,7 +4,7 @@
 //!
 //! ## Examples
 //!
-//! - [PWM example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/pwm.rs)
+//! - [PWM example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/pwm.rs)
 use core::marker::PhantomData;
 
 use crate::{clock::enable_peripheral_clock, gpio::DynPinId};

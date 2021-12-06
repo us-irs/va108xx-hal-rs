@@ -2,7 +2,8 @@
 //!
 //! ## Examples
 //!
-//! - [MS and second tick implementation](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/timer-ticks.rs)
+//! - [MS and second tick implementation](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/timer-ticks.rs)
+//! - [Cascade feature example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/cascade.rs)
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
     gpio::{

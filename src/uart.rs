@@ -2,7 +2,7 @@
 //!
 //! ## Examples
 //!
-//! - [UART example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/uart.rs)
+//! - [UART example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/uart.rs)
 use core::{convert::Infallible, ptr};
 use core::{marker::PhantomData, ops::Deref};
 use libm::floorf;

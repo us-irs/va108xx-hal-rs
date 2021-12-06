@@ -2,7 +2,7 @@
 //!
 //! ## Examples
 //!
-//! - [Blocking SPI example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/spi.rs)
+//! - [Blocking SPI example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/spi.rs)
 use crate::Sealed;
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},

@@ -20,7 +20,7 @@
 //!
 //! ## Examples
 //!
-//! - [Blinky example](https://github.com/robamu-org/va108xx-hal-rs/blob/main/examples/blinky.rs)
+//! - [Blinky example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/blinky.rs)
 pub mod dynpins;
 pub use dynpins::*;
 
