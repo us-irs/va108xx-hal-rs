@@ -81,11 +81,7 @@ is contained within the
 	features = ["rt"]
    ```
 
-6. Build the application with
-
-	```sh
-	cargo build
-	```
+6. Build the application with `cargo build`
 
 7. Flashing the board might work differently for different boards and there is usually
    more than one way. You can find example instructions for the REB1 development board
