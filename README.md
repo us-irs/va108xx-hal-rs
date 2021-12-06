@@ -71,13 +71,13 @@ is contained within the
 
    ```toml
 	[dependencies]
-	cortex-m = "0.7.3"
-	cortex-m-rt = "0.7.0"
-	panic-halt = "0.2"
-	embedded-hal = "0.2.6"
+	cortex-m = "<Compatible Version>"
+	cortex-m-rt = "<Compatible Version>"
+	panic-halt = "<Compatible Version>"
+	embedded-hal = "<Compatible Version>"
 
 	[dependencies.va108xx-hal]
-	version = "0.2"
+	version = "<Most Recent Version>"
 	features = ["rt"]
    ```
 
