@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+## [v0.3.0]
+
 ### Added
 
 - TIM Cascade example
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 
 - `CountDownTimer` new function now expects an `impl Into<Hertz>` instead of `Hertz`
+- Primary repository now hosted on IRS external git: https://egit.irs.uni-stuttgart.de/rust/va108xx-hal
+- Relicensed as Apache-2.0
 
 ## [0.2.3]
 
