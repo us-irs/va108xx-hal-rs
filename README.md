@@ -5,7 +5,7 @@
 # HAL for the Vorago VA108xx MCU family
 
 This repository contains the **H**ardware **A**bstraction **L**ayer (HAL), which is an additional
-hardware abstraction on top of the [peripheral access API](https://egit.irs.uni-stuttgart.de/rust/va108xx-rs).
+hardware abstraction on top of the [peripheral access API](https://egit.irs.uni-stuttgart.de/rust/va108xx).
 
 It is the result of reading the datasheet for the device and encoding a type-safe layer over the
 raw PAC. This crate also implements traits specified by the
