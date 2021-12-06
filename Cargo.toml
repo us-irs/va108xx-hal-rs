@@ -1,12 +1,12 @@
 [package]
 name = "va108xx-hal"
 version = "0.2.3"
-authors = ["Robin Mueller <robin.mueller.m@gmail.com>"]
+authors = ["Robin Mueller <muellerr@irs.uni-stuttgart.de>"]
 edition = "2021"
 description = "HAL for the Vorago VA108xx family of microcontrollers"
-homepage = "https://github.com/robamu-org/va108xx-hal-rs"
-repository = "https://github.com/robamu-org/va108xx-hal-rs"
-license = "MIT OR Apache-2.0"
+homepage = "https://egit.irs.uni-stuttgart.de/rust/va108xx-hal"
+repository = "https://egit.irs.uni-stuttgart.de/rust/va108xx-hal"
+license = "Apache-2.0"
 keywords = ["no-std", "hal", "cortex-m", "vorago", "va108xx"]
 categories = ["embedded", "no-std", "hardware-support"]
 
