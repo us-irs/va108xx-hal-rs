@@ -21,7 +21,7 @@ once_cell = { version = "1.8.0", default-features = false }
 libm = "0.2.1"
 
 [dependencies.va108xx]
-version = "0.2.3"
+version = "0.2.4"
 
 [features]
 rt = ["va108xx/rt"]
@@ -50,4 +50,8 @@ required-features = ["rt"]
 
 [[example]]
 name = "pwm"
+required-features = ["rt"]
+
+[[example]]
+name = "cascade"
 required-features = ["rt"]

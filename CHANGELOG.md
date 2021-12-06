@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [unreleased]
+
+### Added
+
+- TIM Cascade example
+
+### Changed
+
+- `CountDownTimer` new function now expects an `impl Into<Hertz>` instead of `Hertz`
+
 ## [0.2.3]
 
 ### Added

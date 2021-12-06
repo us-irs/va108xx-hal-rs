@@ -42,8 +42,61 @@ pub enum Event {
     TimeOut,
 }
 
+#[derive(Default, Debug, PartialEq, Copy, Clone)]
+pub struct CascadeCtrl {
+    /// Enable Cascade 0 signal active as a requirement for counting
+    pub enb_start_src_csd0: bool,
+    /// Invert Cascade 0, making it active low
+    pub inv_csd0: bool,
+    /// Enable Cascade 1 signal active as a requirement for counting
+    pub enb_start_src_csd1: bool,
+    /// Invert Cascade 1, making it active low
+    pub inv_csd1: bool,
+    /// Specify required operation if both Cascade 0 and Cascade 1 are active.
+    /// 0 is a logical AND of both cascade signals, 1 is a logical OR
+    pub dual_csd_op: bool,
+    /// Enable trigger mode for Cascade 0. In trigger mode, couting will start with the selected
+    /// cascade signal active, but once the counter is active, cascade control will be ignored
+    pub trg_csd0: bool,
+    /// Trigger mode, identical to [`trg_csd0`](CascadeCtrl) but for Cascade 1
+    pub trg_csd1: bool,
+    /// Enable Cascade 2 signal active as a requirement to stop counting. This mode is similar
+    /// to the REQ_STOP control bit, but signalled by a Cascade source
+    pub enb_stop_src_csd2: bool,
+    /// Invert Cascade 2, making it active low
+    pub inv_csd2: bool,
+    /// The counter is automatically disabled if the corresponding Cascade 2 level-sensitive input
+    /// souce is active when the count reaches 0. If the counter is not 0, the cascade control is
+    /// ignored
+    pub trg_csd2: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum CascadeSel {
+    Csd0 = 0,
+    Csd1 = 1,
+    Csd2 = 2,
+}
+
+/// The numbers are the base numbers for bundles like PORTA, PORTB or TIM
+#[derive(Debug, PartialEq)]
+pub enum CascadeSource {
+    PortABase = 0,
+    PortBBase = 32,
+    TimBase = 64,
+    RamSbe = 96,
+    RamMbe = 97,
+    RomSbe = 98,
+    RomMbe = 99,
+    Txev = 100,
+    ClockDividerBase = 120,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum TimerErrors {
     Canceled,
+    /// Invalid input for Cascade source
+    InvalidCsdSourceInput,
 }
 
 //==================================================================================================
@@ -350,13 +403,84 @@ unsafe impl<TIM: ValidTim> TimRegInterface for CountDownTimer<TIM> {
     }
 }
 
+macro_rules! csd_sel {
+    ($func_name:ident, $csd_reg:ident) => {
+        /// Configure the Cascade sources
+        pub fn $func_name(
+            &mut self,
+            src: CascadeSource,
+            id: Option<u8>,
+        ) -> Result<(), TimerErrors> {
+            let mut id_num = 0;
+            if let CascadeSource::PortABase
+            | CascadeSource::PortBBase
+            | CascadeSource::ClockDividerBase
+            | CascadeSource::TimBase = src
+            {
+                if id.is_none() {
+                    return Err(TimerErrors::InvalidCsdSourceInput);
+                }
+            }
+            if id.is_some() {
+                id_num = id.unwrap();
+            }
+            match src {
+                CascadeSource::PortABase => {
+                    if id_num > 55 {
+                        return Err(TimerErrors::InvalidCsdSourceInput);
+                    }
+                    self.tim.reg().$csd_reg.write(|w| unsafe {
+                        w.cassel().bits(CascadeSource::PortABase as u8 + id_num)
+                    });
+                    Ok(())
+                }
+                CascadeSource::PortBBase => {
+                    if id_num > 23 {
+                        return Err(TimerErrors::InvalidCsdSourceInput);
+                    }
+                    self.tim.reg().$csd_reg.write(|w| unsafe {
+                        w.cassel().bits(CascadeSource::PortBBase as u8 + id_num)
+                    });
+                    Ok(())
+                }
+                CascadeSource::TimBase => {
+                    if id_num > 23 {
+                        return Err(TimerErrors::InvalidCsdSourceInput);
+                    }
+                    self.tim.reg().$csd_reg.write(|w| unsafe {
+                        w.cassel().bits(CascadeSource::TimBase as u8 + id_num)
+                    });
+                    Ok(())
+                }
+                CascadeSource::ClockDividerBase => {
+                    if id_num > 7 {
+                        return Err(TimerErrors::InvalidCsdSourceInput);
+                    }
+                    self.tim.reg().cascade0.write(|w| unsafe {
+                        w.cassel()
+                            .bits(CascadeSource::ClockDividerBase as u8 + id_num)
+                    });
+                    Ok(())
+                }
+                _ => {
+                    self.tim
+                        .reg()
+                        .$csd_reg
+                        .write(|w| unsafe { w.cassel().bits(src as u8) });
+                    Ok(())
+                }
+            }
+        }
+    };
+}
+
 impl<TIM: ValidTim> CountDownTimer<TIM> {
     /// Configures a TIM peripheral as a periodic count down timer
-    pub fn new(syscfg: &mut SYSCONFIG, sys_clk: Hertz, tim: TIM) -> Self {
+    pub fn new(syscfg: &mut SYSCONFIG, sys_clk: impl Into<Hertz>, tim: TIM) -> Self {
         enable_tim_clk(syscfg, TIM::TIM_ID);
         let cd_timer = CountDownTimer {
             tim: unsafe { TimRegister::new(tim) },
-            sys_clk,
+            sys_clk: sys_clk.into(),
             rst_val: 0,
             curr_freq: 0.hz(),
             listening: false,
@@ -380,7 +504,7 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
             Event::TimeOut => {
                 enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
                 irqsel.tim[TIM::TIM_ID as usize].write(|w| unsafe { w.bits(interrupt as u32) });
-                self.tim.reg().ctrl.modify(|_, w| w.irq_enb().set_bit());
+                self.enable_interrupt();
                 self.listening = true;
             }
         }
@@ -391,10 +515,20 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
             Event::TimeOut => {
                 enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
                 irqsel.tim[TIM::TIM_ID as usize].write(|w| unsafe { w.bits(IRQ_DST_NONE) });
-                self.tim.reg().ctrl.modify(|_, w| w.irq_enb().clear_bit());
+                self.disable_interrupt();
                 self.listening = false;
             }
         }
+    }
+
+    #[inline(always)]
+    pub fn enable_interrupt(&mut self) {
+        self.tim.reg().ctrl.modify(|_, w| w.irq_enb().set_bit());
+    }
+
+    #[inline(always)]
+    pub fn disable_interrupt(&mut self) {
+        self.tim.reg().ctrl.modify(|_, w| w.irq_enb().clear_bit());
     }
 
     pub fn release(self, syscfg: &mut SYSCONFIG) -> TIM {
@@ -405,6 +539,28 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
         self.tim.release()
     }
 
+    /// Load the count down timer with a timeout but do not start it.
+    pub fn load(&mut self, timeout: impl Into<Hertz>) {
+        self.tim.reg().ctrl.modify(|_, w| w.enable().clear_bit());
+        self.curr_freq = timeout.into();
+        self.rst_val = self.sys_clk.0 / self.curr_freq.0;
+        unsafe {
+            self.tim.reg().rst_value.write(|w| w.bits(self.rst_val));
+            self.tim.reg().cnt_value.write(|w| w.bits(self.rst_val));
+        }
+    }
+
+    #[inline(always)]
+    pub fn enable(&mut self) {
+        self.tim.reg().ctrl.modify(|_, w| w.enable().set_bit());
+    }
+
+    #[inline(always)]
+    pub fn disable(&mut self) {
+        self.tim.reg().ctrl.modify(|_, w| w.enable().clear_bit());
+    }
+
+    /// Disable the counter, setting both enable and active bit to 0
     pub fn auto_disable(self, enable: bool) -> Self {
         if enable {
             self.tim
@@ -420,6 +576,10 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
         self
     }
 
+    /// This option only applies when the Auto-Disable functionality is 0.
+    ///
+    /// The active bit is changed to 0 when count reaches 0, but the counter stays
+    /// enabled. When Auto-Disable is 1, Auto-Deactivate is implied
     pub fn auto_deactivate(self, enable: bool) -> Self {
         if enable {
             self.tim
@@ -435,6 +595,26 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
         self
     }
 
+    /// Configure the cascade parameters
+    pub fn cascade_control(&mut self, ctrl: CascadeCtrl) {
+        self.tim.reg().csd_ctrl.write(|w| {
+            w.csden0().bit(ctrl.enb_start_src_csd0);
+            w.csdinv0().bit(ctrl.inv_csd0);
+            w.csden1().bit(ctrl.enb_start_src_csd1);
+            w.csdinv1().bit(ctrl.inv_csd1);
+            w.dcasop().bit(ctrl.dual_csd_op);
+            w.csdtrg0().bit(ctrl.trg_csd0);
+            w.csdtrg1().bit(ctrl.trg_csd1);
+            w.csden2().bit(ctrl.enb_stop_src_csd2);
+            w.csdinv2().bit(ctrl.inv_csd2);
+            w.csdtrg2().bit(ctrl.trg_csd2)
+        });
+    }
+
+    csd_sel!(cascade_0_source, cascade0);
+    csd_sel!(cascade_1_source, cascade1);
+    csd_sel!(cascade_2_source, cascade2);
+
     pub fn curr_freq(&self) -> Hertz {
         self.curr_freq
     }
@@ -448,18 +628,13 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
 impl<TIM: ValidTim> CountDown for CountDownTimer<TIM> {
     type Time = Hertz;
 
+    #[inline]
     fn start<T>(&mut self, timeout: T)
     where
         T: Into<Hertz>,
     {
-        self.tim.reg().ctrl.modify(|_, w| w.enable().clear_bit());
-        self.curr_freq = timeout.into();
-        self.rst_val = self.sys_clk.0 / self.curr_freq.0;
-        unsafe {
-            self.tim.reg().rst_value.write(|w| w.bits(self.rst_val));
-            self.tim.reg().cnt_value.write(|w| w.bits(self.rst_val));
-        }
-        self.tim.reg().ctrl.modify(|_, w| w.enable().set_bit());
+        self.load(timeout);
+        self.enable();
     }
 
     /// Return `Ok` if the timer has wrapped. Peripheral will automatically clear the
