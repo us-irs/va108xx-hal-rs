@@ -25,7 +25,7 @@ fn main() -> ! {
         (tx, rx),
         115200.bps(),
         &mut dp.SYSCONFIG,
-        50.mhz().into(),
+        50.mhz(),
     );
     let (mut tx, mut rx) = uartb.split();
     writeln!(tx, "Hello World\r").unwrap();

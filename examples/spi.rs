@@ -114,12 +114,8 @@ fn main() -> ! {
     match SPI_BUS_SEL {
         SpiBusSelect::SpiAPortA | SpiBusSelect::SpiAPortB => {
             if let Some(ref mut spi) = *spia_ref.borrow_mut() {
-                let transfer_cfg = TransferConfig::new_no_hw_cs(
-                    SPI_SPEED_KHZ.khz().into(),
-                    SPI_MODE,
-                    BLOCKMODE,
-                    false,
-                );
+                let transfer_cfg =
+                    TransferConfig::new_no_hw_cs(SPI_SPEED_KHZ.khz(), SPI_MODE, BLOCKMODE, false);
                 spi.cfg_transfer(&transfer_cfg);
             }
         }
@@ -127,7 +123,7 @@ fn main() -> ! {
             if let Some(ref mut spi) = *spib_ref.borrow_mut() {
                 let hw_cs_pin = pinsb.pb2.into_funsel_1();
                 let transfer_cfg = TransferConfig::new(
-                    SPI_SPEED_KHZ.khz().into(),
+                    SPI_SPEED_KHZ.khz(),
                     SPI_MODE,
                     Some(hw_cs_pin),
                     BLOCKMODE,

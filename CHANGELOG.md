@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [unreleased]
+
+## [v0.4.0]
+
+### Changed
+
+- Replaced `Hertz` by `impl Into<Hertz>` completely and removed
+  `+ Copy` where not necessary
+
 ## [v0.3.1]
 
 - Updated all links to point to new repository

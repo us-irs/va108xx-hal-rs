@@ -231,7 +231,7 @@ macro_rules! i2c_base {
             impl I2cBase<$I2CX> {
                 pub fn $i2cx(
                     i2c: $I2CX,
-                    sys_clk: impl Into<Hertz> + Copy,
+                    sys_clk: impl Into<Hertz>,
                     speed_mode: I2cSpeed,
                     ms_cfg: Option<&MasterConfig>,
                     sl_cfg: Option<&SlaveConfig>,
@@ -740,7 +740,7 @@ macro_rules! i2c_slave {
                 fn $i2cx_slave(
                     i2c: $I2CX,
                     cfg: SlaveConfig,
-                    sys_clk: impl Into<Hertz> + Copy,
+                    sys_clk: impl Into<Hertz>,
                     speed_mode: I2cSpeed,
                     sys_cfg: Option<&mut SYSCONFIG>,
                 ) -> Self {
@@ -897,7 +897,7 @@ macro_rules! i2c_slave {
                 pub fn i2ca(
                     i2c: $I2CX,
                     cfg: SlaveConfig,
-                    sys_clk: impl Into<Hertz> + Copy,
+                    sys_clk: impl Into<Hertz>,
                     speed_mode: I2cSpeed,
                     sys_cfg: Option<&mut SYSCONFIG>,
                 ) -> Result<Self, Error> {
@@ -912,7 +912,7 @@ macro_rules! i2c_slave {
                 pub fn $i2cx(
                     i2c: $I2CX,
                     cfg: SlaveConfig,
-                    sys_clk: impl Into<Hertz> + Copy,
+                    sys_clk: impl Into<Hertz>,
                     speed_mode: I2cSpeed,
                     sys_cfg: Option<&mut SYSCONFIG>,
                 ) -> Self {
