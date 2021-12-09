@@ -218,9 +218,9 @@ pub struct ReducedTransferConfig {
 }
 
 impl TransferConfig<NoneT> {
-    pub fn new_no_hw_cs(spi_clk: Hertz, mode: Mode, blockmode: bool, sod: bool) -> Self {
+    pub fn new_no_hw_cs(spi_clk: impl Into<Hertz>, mode: Mode, blockmode: bool, sod: bool) -> Self {
         TransferConfig {
-            spi_clk,
+            spi_clk: spi_clk.into(),
             mode,
             hw_cs: None,
             sod,
@@ -231,14 +231,14 @@ impl TransferConfig<NoneT> {
 
 impl<HWCS: HwCs> TransferConfig<HWCS> {
     pub fn new(
-        spi_clk: Hertz,
+        spi_clk: impl Into<Hertz>,
         mode: Mode,
         hw_cs: Option<HWCS>,
         blockmode: bool,
         sod: bool,
     ) -> Self {
         TransferConfig {
-            spi_clk,
+            spi_clk: spi_clk.into(),
             mode,
             hw_cs,
             sod,
@@ -452,7 +452,7 @@ macro_rules! spi {
                 }
 
                 #[inline]
-                pub fn cfg_clock(&mut self, spi_clk: Hertz) {
+                pub fn cfg_clock(&mut self, spi_clk: impl Into<Hertz>) {
                     self.spi_base.cfg_clock(spi_clk);
                 }
 
@@ -482,8 +482,8 @@ macro_rules! spi {
 
             impl<WORD: Word> SpiBase<$SPIX, WORD> {
                 #[inline]
-                pub fn cfg_clock(&mut self, spi_clk: Hertz) {
-                    let clk_prescale = self.sys_clk.0 / (spi_clk.0 * (self.cfg.scrdv as u32 + 1));
+                pub fn cfg_clock(&mut self, spi_clk: impl Into<Hertz>) {
+                    let clk_prescale = self.sys_clk.0 / (spi_clk.into().0 * (self.cfg.scrdv as u32 + 1));
                     self.spi
                         .clkprescale
                         .write(|w| unsafe { w.bits(clk_prescale) });

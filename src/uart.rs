@@ -306,12 +306,12 @@ macro_rules! uart_impl {
                     pins: PINS,
                     config: impl Into<Config>,
                     syscfg: &mut SYSCONFIG,
-                    sys_clk: Hertz
+                    sys_clk: impl Into<Hertz>
                 ) -> Self
                 {
                     enable_peripheral_clock(syscfg, $clk_enb_enum);
                     Uart { uart, pins, tx: Tx::new(), rx: Rx::new() }.init(
-                        config.into(), sys_clk
+                        config.into(), sys_clk.into()
                     )
                 }
             }
