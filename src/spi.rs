@@ -428,6 +428,7 @@ macro_rules! spi {
                         w.sod().bit(sod);
                         w.ms().bit(ms);
                         w.mdlycap().bit(mdlycap);
+                        w.blockmode().bit(init_blockmode);
                         unsafe { w.ss().bits(ss) }
                     });
 
