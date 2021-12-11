@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+## [v0.4.1]
+
+### Fixed
+
+- Initial blockmode setting was not set in SPI constructor
+
 ## [v0.4.0]
 
 ### Changed
