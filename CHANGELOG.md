@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+## [v0.4.2]
+
+### Added
+
+- `port_mux` function to set pin function select manually
+
+### Changed
+
+- Clear TX and RX FIFO in SPI transfer function
+
 ## [v0.4.1]
 
 ### Fixed
