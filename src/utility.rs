@@ -3,11 +3,25 @@
 //! Some more information about the recommended scrub rates can be found on the
 //! [Vorago White Paper website](https://www.voragotech.com/resources) in the
 //! application note AN1212
-use va108xx::SYSCONFIG;
+use va108xx::{IOCONFIG, SYSCONFIG};
 
 #[derive(PartialEq, Debug)]
 pub enum UtilityError {
     InvalidCounterResetVal,
+    InvalidPin,
+}
+
+#[derive(Debug, Eq, Copy, Clone, PartialEq)]
+pub enum Funsel {
+    Funsel1 = 0b01,
+    Funsel2 = 0b10,
+    Funsel3 = 0b11,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum PortSel {
+    PortA,
+    PortB,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -71,4 +85,29 @@ pub fn set_reset_bit(syscfg: &mut SYSCONFIG, periph_sel: PeripheralSelect) {
     syscfg
         .peripheral_reset
         .modify(|r, w| unsafe { w.bits(r.bits() | (1 << periph_sel as u8)) });
+}
+
+/// Can be used to manually manipulate the function select of port pins
+pub fn port_mux(
+    ioconfig: &mut IOCONFIG,
+    port: PortSel,
+    pin: u8,
+    funsel: Funsel,
+) -> Result<(), UtilityError> {
+    match port {
+        PortSel::PortA => {
+            if pin > 31 {
+                return Err(UtilityError::InvalidPin);
+            }
+            ioconfig.porta[pin as usize].modify(|_, w| unsafe { w.funsel().bits(funsel as u8) });
+            Ok(())
+        }
+        PortSel::PortB => {
+            if pin > 23 {
+                return Err(UtilityError::InvalidPin);
+            }
+            ioconfig.portb[pin as usize].modify(|_, w| unsafe { w.funsel().bits(funsel as u8) });
+            Ok(())
+        }
+    }
 }

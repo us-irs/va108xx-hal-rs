@@ -57,14 +57,17 @@
 //! operation, the trait functions will return
 //! [`InvalidPinType`](PinError::InvalidPinType).
 
-use super::pins::{
-    common_reg_if_functions, FilterType, InterruptEdge, InterruptLevel, Pin, PinError, PinId,
-    PinMode, PinState,
+use super::{
+    pins::{
+        common_reg_if_functions, FilterType, InterruptEdge, InterruptLevel, Pin, PinError, PinId,
+        PinMode, PinState,
+    },
+    reg::RegisterInterface,
 };
-use super::reg::RegisterInterface;
 use crate::{
     clock::FilterClkSel,
     pac::{self, IRQSEL, SYSCONFIG},
+    utility::Funsel,
 };
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
 use paste::paste;
@@ -98,13 +101,7 @@ pub enum DynOutput {
     ReadableOpenDrain,
 }
 
-/// Value-level `enum` for alternate peripheral function configurations
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum DynAlternate {
-    Funsel1,
-    Funsel2,
-    Funsel3,
-}
+pub type DynAlternate = Funsel;
 
 //==================================================================================================
 //  DynPinMode

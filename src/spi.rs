@@ -505,6 +505,16 @@ macro_rules! spi {
                 }
 
                 #[inline]
+                pub fn clear_tx_fifo(&self) {
+                    self.spi.fifo_clr.write(|w| w.txfifo().set_bit());
+                }
+
+                #[inline]
+                pub fn clear_rx_fifo(&self) {
+                    self.spi.fifo_clr.write(|w| w.rxfifo().set_bit());
+                }
+
+                #[inline]
                 pub fn perid(&self) -> u32 {
                     self.spi.perid.read().bits()
                 }
@@ -639,6 +649,9 @@ macro_rules! spi {
                     ) -> Result<(), Infallible> {
                         // FIFO has a depth of 16.
                         const FILL_DEPTH: usize = 12;
+
+                        self.clear_tx_fifo();
+                        self.clear_rx_fifo();
 
                         if self.blockmode {
                             self.spi.ctrl1.modify(|_, w| {
