@@ -85,4 +85,4 @@ is contained within the
 
 7. Flashing the board might work differently for different boards and there is usually
    more than one way. You can find example instructions for the REB1 development board
-   [here](https://github.com/robamu-org/vorago-reb1-rs).
+   [here](https://egit.irs.uni-stuttgart.de/rust/vorago-reb1).
