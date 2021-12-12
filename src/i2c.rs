@@ -2,7 +2,7 @@
 //!
 //! ## Examples
 //!
-//! - [REB1 I2C temperature sensor example](https://github.com/robamu-org/vorago-reb1-rs/blob/main/examples/temp-sensor.rs)
+//! - [REB1 I2C temperature sensor example](https://egit.irs.uni-stuttgart.de/rust/vorago-reb1/src/branch/main/examples/adt75-temp-sensor.rs)
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
     pac::{I2CA, I2CB, SYSCONFIG},
