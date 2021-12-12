@@ -60,18 +60,7 @@ impl From<DynPinMode> for ModeFields {
                 }
             }
             Alternate(config) => {
-                use dynpins::DynAlternate::*;
-                match config {
-                    Funsel1 => {
-                        fields.funsel = 1;
-                    }
-                    Funsel2 => {
-                        fields.funsel = 2;
-                    }
-                    Funsel3 => {
-                        fields.funsel = 3;
-                    }
-                }
+                fields.funsel = config as u8;
             }
         }
         fields
