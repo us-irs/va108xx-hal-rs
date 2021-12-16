@@ -16,14 +16,11 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
-          use-cross: true
           command: check
-          args: --target thumbv6m-none-eabi
       - uses: actions-rs/cargo@v1
         with:
-          use-cross: true
           command: check
-          args: --examples --target thumbv6m-none-eabi
+          args: --examples
 
   fmt:
     name: Rustfmt
@@ -55,9 +52,8 @@ jobs:
       - run: rustup component add clippy
       - uses: actions-rs/cargo@v1
         with:
-          use-cross: true
           command: clippy
-          args: --target thumbv6m-none-eabi -- -D warnings
+          args: -- -D warnings
 
   ci:
       if: ${{ success() }}
