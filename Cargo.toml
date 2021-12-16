@@ -36,9 +36,14 @@ debug = true
 lto = false
 
 [profile.release]
-lto = true
+# Problematic because RTT won't work
+lto = false
 debug = true
 opt-level = "s"
+
+[profile.release-lto]
+inherits = "release"
+lto = true
 
 [[example]]
 name = "timer-ticks"
