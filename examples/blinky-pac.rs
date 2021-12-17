@@ -1,4 +1,3 @@
-
 //! Blinky examples using only the PAC
 //!
 //! Additional note on LEDs:
