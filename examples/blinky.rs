@@ -9,7 +9,7 @@
 use cortex_m_rt::entry;
 use embedded_hal::digital::v2::ToggleableOutputPin;
 use panic_halt as _;
-use va108xx_hal::{gpio::PinsA, pac, prelude::*};
+use va108xx_hal::{gpio::PinsA, pac, prelude::*, timer::set_up_ms_timer};
 
 #[entry]
 fn main() -> ! {
@@ -18,22 +18,29 @@ fn main() -> ! {
     let mut led1 = porta.pa10.into_push_pull_output();
     let mut led2 = porta.pa7.into_push_pull_output();
     let mut led3 = porta.pa6.into_push_pull_output();
+    let mut delay = set_up_ms_timer(
+        &mut dp.SYSCONFIG,
+        &mut dp.IRQSEL,
+        50.mhz().into(),
+        dp.TIM0,
+        pac::Interrupt::OC0,
+    );
     for _ in 0..10 {
         led1.set_low().ok();
         led2.set_low().ok();
         led3.set_low().ok();
-        cortex_m::asm::delay(5_000_000);
+        delay.delay_ms(200_u16);
         led1.set_high().ok();
         led2.set_high().ok();
         led3.set_high().ok();
-        cortex_m::asm::delay(5_000_000);
+        delay.delay_ms(200_u16);
     }
     loop {
         led1.toggle().ok();
-        cortex_m::asm::delay(5_000_000);
+        delay.delay_ms(200_u16);
         led2.toggle().ok();
-        cortex_m::asm::delay(5_000_000);
+        delay.delay_ms(200_u16);
         led3.toggle().ok();
-        cortex_m::asm::delay(5_000_000);
+        delay.delay_ms(200_u16);
     }
 }
