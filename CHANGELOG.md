@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased]
 
+## [v0.4.3]
+
+- Various smaller fixes for READMEs, update of links in documentation
+- Simplified CI for github, do not use `cross`
+- New `blinky-pac` example
+- Use HAL delay in `blinky` example
+
 ## [v0.4.2]
 
 ### Added
