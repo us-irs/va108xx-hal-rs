@@ -41,9 +41,10 @@ lto = false
 debug = true
 opt-level = "s"
 
-[profile.release-lto]
-inherits = "release"
-lto = true
+# Commented until named-profiles feature is stabilized
+# [profile.release-lto]
+# inherits = "release"
+# lto = true
 
 [[example]]
 name = "timer-ticks"
