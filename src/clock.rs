@@ -50,12 +50,14 @@ pub fn set_clk_div_register(syscfg: &mut SYSCONFIG, clk_sel: FilterClkSel, div: 
     }
 }
 
+#[inline]
 pub fn enable_peripheral_clock(syscfg: &mut SYSCONFIG, clock: PeripheralClocks) {
     syscfg
         .peripheral_clk_enable
         .modify(|r, w| unsafe { w.bits(r.bits() | (1 << clock as u8)) });
 }
 
+#[inline]
 pub fn disable_peripheral_clock(syscfg: &mut SYSCONFIG, clock: PeripheralClocks) {
     syscfg
         .peripheral_clk_enable
