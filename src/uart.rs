@@ -7,10 +7,9 @@ use core::{convert::Infallible, ptr};
 use core::{marker::PhantomData, ops::Deref};
 use libm::floorf;
 
-use crate::clock::enable_peripheral_clock;
 pub use crate::utility::IrqCfg;
 use crate::{
-    clock,
+    clock::{self, enable_peripheral_clock, PeripheralClocks},
     gpio::pins::{
         AltFunc1, AltFunc2, AltFunc3, Pin, PA16, PA17, PA18, PA19, PA2, PA26, PA27, PA3, PA30,
         PA31, PA8, PA9, PB18, PB19, PB20, PB21, PB22, PB23, PB6, PB7, PB8, PB9,
@@ -56,6 +55,8 @@ pub enum Error {
     BreakCondition,
     TransferPending,
     BufferTooShort,
+    /// Can be a combination of overrun, framing or parity error
+    IrqError,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -191,10 +192,23 @@ pub enum IrqResultMask {
     Break = 4,
     Timeout = 5,
     Addr9 = 6,
+    /// Should not happen
+    Unknown = 7,
 }
+
+#[derive(Debug, Default)]
 pub struct IrqResult {
     raw_res: u32,
     pub bytes_read: usize,
+}
+
+impl IrqResult {
+    pub const fn new() -> Self {
+        IrqResult {
+            raw_res: 0,
+            bytes_read: 0,
+        }
+    }
 }
 
 impl IrqResult {
@@ -214,7 +228,7 @@ impl IrqResult {
 
     #[inline]
     pub fn complete(&self) -> bool {
-        if ((self.raw_res >> IrqResultMask::Complete as u32) & 0x01) == 0x00 {
+        if ((self.raw_res >> IrqResultMask::Complete as u32) & 0x01) == 0x01 {
             return true;
         }
         false
@@ -272,16 +286,24 @@ pub enum IrqReceptionMode {
 // UART implementation
 //==================================================================================================
 
-/// Serial abstraction
-pub struct Uart<UART, PINS> {
+pub struct UartBase<UART> {
     uart: UART,
-    pins: PINS,
     tx: Tx<UART>,
     rx: Rx<UART>,
 }
+/// Serial abstraction
+pub struct Uart<UART, PINS> {
+    uart_base: UartBase<UART>,
+    pins: PINS,
+}
 
 pub struct UartWithIrq<UART, PINS> {
-    uart_base: Uart<UART, PINS>,
+    irq_base: UartWithIrqBase<UART>,
+    pins: PINS,
+}
+
+pub struct UartWithIrqBase<UART> {
+    pub uart: UartBase<UART>,
     irq_info: IrqInfo,
 }
 
@@ -313,12 +335,10 @@ impl<UART> Tx<UART> {
 
 pub trait Instance: Deref<Target = uart_base::RegisterBlock> {
     fn ptr() -> *const uart_base::RegisterBlock;
+    const IDX: u8;
 }
 
-impl<UART, PINS> Uart<UART, PINS>
-where
-    UART: Instance,
-{
+impl<UART: Instance> UartBase<UART> {
     /// This function assumes that the peripheral clock was alredy enabled
     /// in the SYSCONFIG register
     fn init(self, config: Config, sys_clk: Hertz) -> Self {
@@ -366,22 +386,22 @@ where
 
     #[inline]
     pub fn enable_rx(&mut self) {
-        self.uart.enable.write(|w| w.rxenable().set_bit());
+        self.uart.enable.modify(|_, w| w.rxenable().set_bit());
     }
 
     #[inline]
     pub fn disable_rx(&mut self) {
-        self.uart.enable.write(|w| w.rxenable().set_bit());
+        self.uart.enable.modify(|_, w| w.rxenable().clear_bit());
     }
 
     #[inline]
     pub fn enable_tx(&mut self) {
-        self.uart.enable.write(|w| w.txenable().set_bit());
+        self.uart.enable.modify(|_, w| w.txenable().set_bit());
     }
 
     #[inline]
     pub fn disable_tx(&mut self) {
-        self.uart.enable.write(|w| w.txenable().set_bit());
+        self.uart.enable.modify(|_, w| w.txenable().clear_bit());
     }
 
     #[inline]
@@ -404,7 +424,7 @@ where
         self.uart.fifo_clr.write(|w| w.txsts().set_bit());
     }
 
-    pub fn listen(self, event: Event) -> Self {
+    pub fn listen(&self, event: Event) {
         self.uart.irq_enb.modify(|_, w| match event {
             Event::RxError => w.irq_rx_status().set_bit(),
             Event::RxFifoHalfFull => w.irq_rx().set_bit(),
@@ -414,10 +434,9 @@ where
             Event::TxFifoHalfFull => w.irq_tx().set_bit(),
             Event::TxCts => w.irq_tx_cts().set_bit(),
         });
-        self
     }
 
-    pub fn unlisten(self, event: Event) -> Self {
+    pub fn unlisten(&self, event: Event) {
         self.uart.irq_enb.modify(|_, w| match event {
             Event::RxError => w.irq_rx_status().clear_bit(),
             Event::RxFifoHalfFull => w.irq_rx().clear_bit(),
@@ -427,10 +446,9 @@ where
             Event::TxFifoHalfFull => w.irq_tx().clear_bit(),
             Event::TxCts => w.irq_tx_cts().clear_bit(),
         });
-        self
     }
 
-    pub fn release(self) -> (UART, PINS) {
+    pub fn release(self) -> UART {
         // Clear the FIFO
         self.uart.fifo_clr.write(|w| {
             w.rxfifo().set_bit();
@@ -440,7 +458,7 @@ where
             w.rxenable().clear_bit();
             w.txenable().clear_bit()
         });
-        (self.uart, self.pins)
+        self.uart
     }
 
     pub fn split(self) -> (Tx<UART>, Rx<UART>) {
@@ -448,14 +466,130 @@ where
     }
 }
 
+impl<UART, PINS> Uart<UART, PINS>
+where
+    UART: Instance,
+{
+    /// This function assumes that the peripheral clock was alredy enabled
+    /// in the SYSCONFIG register
+    fn init(mut self, config: Config, sys_clk: Hertz) -> Self {
+        self.uart_base = self.uart_base.init(config, sys_clk);
+        self
+    }
+
+    pub fn into_uart_with_irq(
+        self,
+        irq_cfg: IrqCfg,
+        sys_cfg: Option<&mut SYSCONFIG>,
+        irq_sel: Option<&mut IRQSEL>,
+    ) -> UartWithIrq<UART, PINS> {
+        let (uart, pins) = self.downgrade_internal();
+        UartWithIrq {
+            pins,
+            irq_base: UartWithIrqBase {
+                uart,
+                irq_info: IrqInfo {
+                    rx_len: 0,
+                    rx_idx: 0,
+                    irq_cfg,
+                    mode: IrqReceptionMode::Idle,
+                },
+            }
+            .init(sys_cfg, irq_sel),
+        }
+    }
+
+    #[inline]
+    pub fn enable_rx(&mut self) {
+        self.uart_base.enable_rx();
+    }
+
+    #[inline]
+    pub fn disable_rx(&mut self) {
+        self.uart_base.enable_rx();
+    }
+
+    #[inline]
+    pub fn enable_tx(&mut self) {
+        self.uart_base.enable_tx();
+    }
+
+    #[inline]
+    pub fn disable_tx(&mut self) {
+        self.uart_base.disable_tx();
+    }
+
+    #[inline]
+    pub fn clear_rx_fifo(&mut self) {
+        self.uart_base.clear_rx_fifo();
+    }
+
+    #[inline]
+    pub fn clear_tx_fifo(&mut self) {
+        self.uart_base.clear_tx_fifo();
+    }
+
+    #[inline]
+    pub fn clear_rx_status(&mut self) {
+        self.uart_base.clear_rx_status();
+    }
+
+    #[inline]
+    pub fn clear_tx_status(&mut self) {
+        self.uart_base.clear_tx_status();
+    }
+
+    pub fn listen(&self, event: Event) {
+        self.uart_base.listen(event);
+    }
+
+    pub fn unlisten(&self, event: Event) {
+        self.uart_base.unlisten(event);
+    }
+
+    pub fn release(self) -> (UART, PINS) {
+        (self.uart_base.release(), self.pins)
+    }
+
+    fn downgrade_internal(self) -> (UartBase<UART>, PINS) {
+        let base = UartBase {
+            uart: self.uart_base.uart,
+            tx: self.uart_base.tx,
+            rx: self.uart_base.rx,
+        };
+        (base, self.pins)
+    }
+
+    pub fn downgrade(self) -> UartBase<UART> {
+        UartBase {
+            uart: self.uart_base.uart,
+            tx: self.uart_base.tx,
+            rx: self.uart_base.rx,
+        }
+    }
+
+    pub fn split(self) -> (Tx<UART>, Rx<UART>) {
+        self.uart_base.split()
+    }
+}
+
+impl Instance for UARTA {
+    fn ptr() -> *const uart_base::RegisterBlock {
+        UARTA::ptr() as *const _
+    }
+    const IDX: u8 = 0;
+}
+
+impl Instance for UARTB {
+    fn ptr() -> *const uart_base::RegisterBlock {
+        UARTB::ptr() as *const _
+    }
+    const IDX: u8 = 1;
+}
+
 macro_rules! uart_impl {
     ($($UARTX:ident: ($uartx:ident, $clk_enb_enum:path),)+) => {
         $(
-            impl Instance for $UARTX {
-                fn ptr() -> *const uart_base::RegisterBlock {
-                    $UARTX::ptr() as *const _
-                }
-            }
 
             impl<PINS: Pins<$UARTX>> Uart<$UARTX, PINS> {
                 pub fn $uartx(
@@ -467,47 +601,49 @@ macro_rules! uart_impl {
                 ) -> Self
                 {
                     enable_peripheral_clock(syscfg, $clk_enb_enum);
-                    Uart { uart, pins, tx: Tx::new(), rx: Rx::new() }.init(
-                        config.into(), sys_clk.into()
-                    )
+                    Uart {
+                        uart_base: UartBase {
+                            uart,
+                            tx: Tx::new(),
+                            rx: Rx::new(),
+                        },
+                        pins,
+                    }
+                    .init(config.into(), sys_clk.into())
                 }
             }
+
         )+
     }
 }
 
-impl<PINS> Uart<UARTA, PINS> {
-    pub fn into_uart_with_irq(self, irq_cfg: IrqCfg) -> UartWithIrq<UARTA, PINS> {
-        UartWithIrq {
-            uart_base: self,
-            irq_info: IrqInfo {
-                rx_len: 0,
-                rx_idx: 0,
-                irq_cfg,
-                mode: IrqReceptionMode::Idle,
-            },
+impl<UART: Instance> UartWithIrqBase<UART> {
+    fn init(self, sys_cfg: Option<&mut SYSCONFIG>, irq_sel: Option<&mut IRQSEL>) -> Self {
+        if let Some(sys_cfg) = sys_cfg {
+            enable_peripheral_clock(sys_cfg, PeripheralClocks::Irqsel)
         }
+        if let Some(irq_sel) = irq_sel {
+            if self.irq_info.irq_cfg.route {
+                irq_sel.uart[UART::IDX as usize]
+                    .write(|w| unsafe { w.bits(self.irq_info.irq_cfg.irq as u32) });
+            }
+        }
+        self
     }
-}
 
-impl<PINS> UartWithIrq<UARTA, PINS> {
     pub fn read_fixed_len_using_irq(
         &mut self,
         max_len: usize,
         enb_timeout_irq: bool,
-        irqsel: Option<&mut IRQSEL>,
     ) -> Result<(), Error> {
         if self.irq_info.mode != IrqReceptionMode::Idle {
             return Err(Error::TransferPending);
         }
         self.irq_info.rx_idx = 0;
         self.irq_info.rx_len = max_len;
+        self.uart.enable_rx();
+        self.uart.enable_tx();
         self.enable_rx_irq_sources(enb_timeout_irq);
-        if let Some(irqsel) = irqsel {
-            if self.irq_info.irq_cfg.route {
-                irqsel.uart[0].write(|w| unsafe { w.bits(self.irq_info.irq_cfg.irq as u32) });
-            }
-        }
         if self.irq_info.irq_cfg.enable {
             unmask_irq(self.irq_info.irq_cfg.irq);
         }
@@ -516,7 +652,7 @@ impl<PINS> UartWithIrq<UARTA, PINS> {
 
     #[inline]
     fn enable_rx_irq_sources(&mut self, timeout: bool) {
-        self.uart_base.uart.irq_enb.modify(|_, w| {
+        self.uart.uart.irq_enb.modify(|_, w| {
             if timeout {
                 w.irq_rx_to().set_bit();
             }
@@ -527,18 +663,28 @@ impl<PINS> UartWithIrq<UARTA, PINS> {
 
     #[inline]
     fn disable_rx_irq_sources(&mut self) {
-        self.uart_base.uart.irq_enb.modify(|_, w| {
+        self.uart.uart.irq_enb.modify(|_, w| {
             w.irq_rx_to().clear_bit();
             w.irq_rx_status().clear_bit();
             w.irq_rx().clear_bit()
         });
     }
 
+    #[inline]
+    pub fn enable_tx(&mut self) {
+        self.uart.enable_tx()
+    }
+
+    #[inline]
+    pub fn disable_tx(&mut self) {
+        self.uart.disable_tx()
+    }
+
     pub fn cancel_transfer(&mut self) {
         // Disable IRQ
         cortex_m::peripheral::NVIC::mask(self.irq_info.irq_cfg.irq);
         self.disable_rx_irq_sources();
-        self.uart_base.clear_tx_fifo();
+        self.uart.clear_tx_fifo();
         self.irq_info.rx_idx = 0;
         self.irq_info.rx_len = 0;
     }
@@ -548,28 +694,59 @@ impl<PINS> UartWithIrq<UARTA, PINS> {
             return Err(Error::BufferTooShort);
         }
 
-        let mut rx_status = self.uart_base.uart.rxstatus.read();
-        let _tx_status = self.uart_base.uart.txstatus.read();
-        let irq_end = self.uart_base.uart.irq_end.read();
-
-        let enb_status = self.uart_base.uart.enable.read();
+        let irq_end = self.uart.uart.irq_end.read();
+        let enb_status = self.uart.uart.enable.read();
         let rx_enabled = enb_status.rxenable().bit_is_set();
         let _tx_enabled = enb_status.txenable().bit_is_set();
-        res.clear_result();
-        if irq_end.irq_rx().bit_is_set() && rx_status.rdavl().bit_is_set() {
-            let mut rd_avl = rx_status.rdavl();
-            // While there is data in the FIFO, write it into the reception buffer
-            while self.irq_info.rx_idx < self.irq_info.rx_len && rd_avl.bit_is_set() {
-                buf[self.irq_info.rx_idx] = nb::block!(self.uart_base.read()).unwrap();
-                rd_avl = self.uart_base.uart.rxstatus.read().rdavl();
+        let read_handler =
+            |res: &mut IrqResult, read_res: nb::Result<u8, Error>| -> Result<Option<u8>, Error> {
+                match read_res {
+                    Ok(byte) => return Ok(Some(byte)),
+                    Err(nb::Error::WouldBlock) => {
+                        return Ok(None);
+                    }
+                    Err(nb::Error::Other(e)) => match e {
+                        Error::Overrun => {
+                            res.set_result(IrqResultMask::Overflow);
+                            return Err(Error::IrqError);
+                        }
+                        Error::FramingError => {
+                            res.set_result(IrqResultMask::FramingError);
+                            return Err(Error::IrqError);
+                        }
+                        Error::ParityError => {
+                            res.set_result(IrqResultMask::ParityError);
+                            return Err(Error::IrqError);
+                        }
+                        _ => {
+                            res.set_result(IrqResultMask::Unknown);
+                            return Err(Error::IrqError);
+                        }
+                    },
+                };
+            };
+        if irq_end.irq_rx().bit_is_set() {
+            // If this interrupt bit is set, the trigger level is available at the very least.
+            // Read everything as fast as possible
+            for _ in 0..core::cmp::min(
+                self.uart.uart.rxfifoirqtrg.read().bits() as usize,
+                self.irq_info.rx_len,
+            ) {
+                buf[self.irq_info.rx_idx] = (self.uart.uart.data.read().bits() & 0xff) as u8;
                 self.irq_info.rx_idx += 1;
+            }
+
+            // While there is data in the FIFO, write it into the reception buffer
+            loop {
                 if self.irq_info.rx_idx == self.irq_info.rx_len {
-                    self.disable_rx_irq_sources();
-                    res.bytes_read = self.irq_info.rx_len;
-                    res.set_result(IrqResultMask::Complete);
-                    self.irq_info.rx_idx = 0;
-                    self.irq_info.rx_len = 0;
+                    self.irq_completion_handler(res);
                     return Ok(());
+                }
+                if let Some(byte) = read_handler(res, self.uart.read())? {
+                    buf[self.irq_info.rx_idx] = byte;
+                    self.irq_info.rx_idx += 1;
+                } else {
+                    break;
                 }
             }
         }
@@ -577,7 +754,8 @@ impl<PINS> UartWithIrq<UARTA, PINS> {
         // RX transfer not complete, check for RX errors
         if (self.irq_info.rx_idx < self.irq_info.rx_len) && rx_enabled {
             // Read status register again, might have changed since reading received data
-            rx_status = self.uart_base.uart.rxstatus.read();
+            let rx_status = self.uart.uart.rxstatus.read();
+            res.clear_result();
             if rx_status.rxovr().bit_is_set() {
                 res.set_result(IrqResultMask::Overflow);
             }
@@ -593,26 +771,73 @@ impl<PINS> UartWithIrq<UARTA, PINS> {
             if rx_status.rxto().bit_is_set() {
                 // A timeout has occured but there might be some leftover data in the FIFO,
                 // so read that data as well
-                while self.irq_info.rx_idx < self.irq_info.rx_len && rx_status.rdavl().bit_is_set()
-                {
-                    buf[self.irq_info.rx_idx] = nb::block!(self.uart_base.read()).unwrap();
-                    self.irq_info.rx_idx += 1;
+                loop {
+                    if let Some(byte) = read_handler(res, self.uart.read())? {
+                        buf[self.irq_info.rx_idx] = byte;
+                        self.irq_info.rx_idx += 1;
+                    } else {
+                        break;
+                    }
                 }
-                res.bytes_read = self.irq_info.rx_idx;
+                self.irq_completion_handler(res);
                 res.set_result(IrqResultMask::Timeout);
-                res.set_result(IrqResultMask::Complete);
+                return Ok(());
             }
 
+            // If it is not a timeout, it's an error
             if res.raw_res != 0 {
                 self.disable_rx_irq_sources();
+                return Err(Error::IrqError);
             }
         }
 
-        self.uart_base
+        // Clear the interrupt status bits
+        self.uart
             .uart
             .irq_clr
             .write(|w| unsafe { w.bits(irq_end.bits()) });
         Ok(())
+    }
+
+    fn irq_completion_handler(&mut self, res: &mut IrqResult) {
+        self.disable_rx_irq_sources();
+        self.uart.disable_rx();
+        res.bytes_read = self.irq_info.rx_idx;
+        res.clear_result();
+        res.set_result(IrqResultMask::Complete);
+        self.irq_info.rx_idx = 0;
+        self.irq_info.rx_len = 0;
+    }
+
+    pub fn release(self) -> UART {
+        self.uart.release()
+    }
+}
+
+impl<UART: Instance, PINS> UartWithIrq<UART, PINS> {
+    pub fn read_fixed_len_using_irq(
+        &mut self,
+        max_len: usize,
+        enb_timeout_irq: bool,
+    ) -> Result<(), Error> {
+        self.irq_base
+            .read_fixed_len_using_irq(max_len, enb_timeout_irq)
+    }
+
+    pub fn cancel_transfer(&mut self) {
+        self.irq_base.cancel_transfer()
+    }
+
+    pub fn irq_handler(&mut self, res: &mut IrqResult, buf: &mut [u8]) -> Result<(), Error> {
+        self.irq_base.irq_handler(res, buf)
+    }
+
+    pub fn release(self) -> (UART, PINS) {
+        (self.irq_base.release(), self.pins)
+    }
+
+    pub fn downgrade(self) -> (UartWithIrqBase<UART>, PINS) {
+        (self.irq_base, self.pins)
     }
 }
 
@@ -623,16 +848,26 @@ uart_impl! {
 
 impl<UART> Tx<UART> where UART: Instance {}
 
-impl<UART, PINS> serial::Write<u8> for Uart<UART, PINS>
-where
-    UART: Instance,
-{
+impl<UART: Instance> serial::Write<u8> for UartBase<UART> {
     type Error = Infallible;
     fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
         self.tx.write(word)
     }
     fn flush(&mut self) -> nb::Result<(), Self::Error> {
         self.tx.flush()
+    }
+}
+
+impl<UART, PINS> serial::Write<u8> for Uart<UART, PINS>
+where
+    UART: Instance,
+{
+    type Error = Infallible;
+    fn write(&mut self, word: u8) -> nb::Result<(), Self::Error> {
+        self.uart_base.write(word)
+    }
+    fn flush(&mut self) -> nb::Result<(), Self::Error> {
+        self.uart_base.flush()
     }
 }
 
@@ -667,11 +902,19 @@ impl<UART: Instance> serial::Write<u8> for Tx<UART> {
     }
 }
 
-impl<UART: Instance, PINS> serial::Read<u8> for Uart<UART, PINS> {
+impl<UART: Instance> serial::Read<u8> for UartBase<UART> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Error> {
         self.rx.read()
+    }
+}
+
+impl<UART: Instance, PINS> serial::Read<u8> for Uart<UART, PINS> {
+    type Error = Error;
+
+    fn read(&mut self) -> nb::Result<u8, Error> {
+        self.uart_base.read()
     }
 }
 
@@ -706,7 +949,7 @@ impl<UART: Instance> serial::Read<u8> for Rx<UART> {
     }
 }
 
-impl<UART> core::fmt::Write for Tx<UART>
+impl<UART: Instance> core::fmt::Write for Tx<UART>
 where
     Tx<UART>: embedded_hal::serial::Write<u8>,
 {
@@ -715,5 +958,14 @@ where
             .iter()
             .try_for_each(|c| nb::block!(self.write(*c)))
             .map_err(|_| core::fmt::Error)
+    }
+}
+
+impl<UART: Instance> core::fmt::Write for UartBase<UART>
+where
+    UartBase<UART>: embedded_hal::serial::Write<u8>,
+{
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.tx.write_str(s)
     }
 }

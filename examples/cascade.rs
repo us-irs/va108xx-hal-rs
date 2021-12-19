@@ -11,7 +11,7 @@ use cortex_m_rt::entry;
 use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
 use va108xx_hal::{
-    pac::{self, Interrupt, TIM4, TIM5},
+    pac::{self, interrupt, TIM4, TIM5},
     prelude::*,
     timer::{
         default_ms_irq_handler, set_up_ms_delay_provider, CascadeCtrl, CascadeSource,

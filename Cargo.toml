@@ -28,6 +28,7 @@ rt = ["va108xx/rt"]
 
 [dev-dependencies]
 cortex-m-rtic = "0.6.0-rc.4"
+arrayvec = { version = "0.7.2", default-features = false }
 panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 panic-halt = "0.2"
