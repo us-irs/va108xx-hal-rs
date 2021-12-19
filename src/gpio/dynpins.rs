@@ -67,7 +67,7 @@ use super::{
 use crate::{
     clock::FilterClkSel,
     pac::{IRQSEL, SYSCONFIG},
-    utility::{IrqCfg, Funsel},
+    utility::{Funsel, IrqCfg},
 };
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
 use paste::paste;
@@ -346,7 +346,7 @@ impl DynPin {
         edge_type: InterruptEdge,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Result<Self, PinError> {
         match self.mode {
             DynPinMode::Input(_) | DynPinMode::Output(_) => {
@@ -363,7 +363,7 @@ impl DynPin {
         level_type: InterruptLevel,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Result<Self, PinError> {
         match self.mode {
             DynPinMode::Input(_) | DynPinMode::Output(_) => {

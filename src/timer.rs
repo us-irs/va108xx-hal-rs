@@ -7,7 +7,6 @@
 pub use crate::utility::IrqCfg;
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
-    utility::unmask_irq,
     gpio::{
         AltFunc1, AltFunc2, AltFunc3, DynPinId, Pin, PinId, PA0, PA1, PA10, PA11, PA12, PA13, PA14,
         PA15, PA2, PA24, PA25, PA26, PA27, PA28, PA29, PA3, PA30, PA31, PA4, PA5, PA6, PA7, PA8,
@@ -22,6 +21,7 @@ use crate::{
     private::Sealed,
     time::Hertz,
     timer,
+    utility::unmask_irq,
 };
 use core::cell::Cell;
 use cortex_m::interrupt::Mutex;

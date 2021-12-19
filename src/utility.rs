@@ -139,6 +139,6 @@ pub fn port_mux(
 ///
 /// The unmask function can break mask-based critical sections
 #[inline]
-pub (crate) fn unmask_irq(irq: pac::Interrupt) {
+pub(crate) fn unmask_irq(irq: pac::Interrupt) {
     unsafe { cortex_m::peripheral::NVIC::unmask(irq) };
 }

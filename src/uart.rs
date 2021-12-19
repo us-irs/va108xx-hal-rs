@@ -16,9 +16,9 @@ use crate::{
         PA31, PA8, PA9, PB18, PB19, PB20, PB21, PB22, PB23, PB6, PB7, PB8, PB9,
     },
     pac::{uarta as uart_base, IRQSEL, SYSCONFIG, UARTA, UARTB},
-    utility::unmask_irq,
     prelude::*,
     time::{Bps, Hertz},
+    utility::unmask_irq,
 };
 
 use embedded_hal::{blocking, serial};

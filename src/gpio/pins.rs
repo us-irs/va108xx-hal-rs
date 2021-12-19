@@ -94,8 +94,8 @@ use super::reg::RegisterInterface;
 use crate::{
     pac::{IOCONFIG, IRQSEL, PORTA, PORTB, SYSCONFIG},
     typelevel::Is,
+    utility::IrqCfg,
     Sealed,
-    utility::IrqCfg
 };
 use core::convert::Infallible;
 use core::marker::PhantomData;
@@ -361,7 +361,6 @@ impl<I: PinId, M: PinMode> AnyPin for Pin<I, M> {
 macro_rules! common_reg_if_functions {
     () => {
         paste!(
-
             #[inline]
             pub fn datamask(&self) -> bool {
                 self.regs.datamask()
@@ -403,7 +402,7 @@ macro_rules! common_reg_if_functions {
                 &mut self,
                 irq_cfg: crate::utility::IrqCfg,
                 syscfg: Option<&mut va108xx::SYSCONFIG>,
-                irqsel: Option<&mut va108xx::IRQSEL>
+                irqsel: Option<&mut va108xx::IRQSEL>,
             ) {
                 if syscfg.is_some() {
                     crate::clock::enable_peripheral_clock(
@@ -585,7 +584,7 @@ impl<I: PinId, C: InputConfig> Pin<I, Input<C>> {
         edge_type: InterruptEdge,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Self {
         self.regs.interrupt_edge(edge_type);
         self.irq_enb(irq_cfg, syscfg, irqsel);
@@ -597,7 +596,7 @@ impl<I: PinId, C: InputConfig> Pin<I, Input<C>> {
         level_type: InterruptLevel,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Self {
         self.regs.interrupt_level(level_type);
         self.irq_enb(irq_cfg, syscfg, irqsel);
@@ -630,7 +629,7 @@ impl<I: PinId, C: OutputConfig> Pin<I, Output<C>> {
         edge_type: InterruptEdge,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Self {
         self.regs.interrupt_edge(edge_type);
         self.irq_enb(irq_cfg, syscfg, irqsel);
@@ -642,7 +641,7 @@ impl<I: PinId, C: OutputConfig> Pin<I, Output<C>> {
         level_type: InterruptLevel,
         irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: Option<&mut IRQSEL>
+        irqsel: Option<&mut IRQSEL>,
     ) -> Self {
         self.regs.interrupt_level(level_type);
         self.irq_enb(irq_cfg, syscfg, irqsel);
