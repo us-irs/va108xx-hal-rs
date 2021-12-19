@@ -27,6 +27,7 @@ version = "0.2.4"
 rt = ["va108xx/rt"]
 
 [dev-dependencies]
+cortex-m-rtic = "0.6.0-rc.4"
 panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 panic-halt = "0.2"
@@ -56,4 +57,8 @@ required-features = ["rt"]
 
 [[example]]
 name = "cascade"
+required-features = ["rt"]
+
+[[example]]
+name = "uart-irq-rtic"
 required-features = ["rt"]
