@@ -14,7 +14,7 @@ use va108xx_hal::{
     pac::{self, interrupt},
     prelude::*,
     time::Hertz,
-    timer::{default_ms_irq_handler, set_up_ms_timer, CountDownTimer, Delay},
+    timer::{default_ms_irq_handler, set_up_ms_timer, CountDownTimer, Delay, IrqCfg},
 };
 
 #[allow(dead_code)]
@@ -146,15 +146,12 @@ fn main() -> ! {
         }
         TestCase::DelayMs => {
             let ms_timer = set_up_ms_timer(
+                IrqCfg::new(pac::Interrupt::OC0, true, true),
                 &mut dp.SYSCONFIG,
-                &mut dp.IRQSEL,
-                50.mhz().into(),
+                Some(&mut dp.IRQSEL),
+                50.mhz(),
                 dp.TIM0,
-                pac::Interrupt::OC0,
             );
-            unsafe {
-                cortex_m::peripheral::NVIC::unmask(pac::Interrupt::OC0);
-            }
             let mut delay = Delay::new(ms_timer);
             for _ in 0..5 {
                 led1.toggle().ok();
@@ -163,7 +160,7 @@ fn main() -> ! {
                 delay.delay_ms(500);
             }
 
-            let mut delay_timer = CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz().into(), dp.TIM1);
+            let mut delay_timer = CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz(), dp.TIM1);
             let mut pa0 = pinsa.pa0.into_push_pull_output();
             for _ in 0..5 {
                 led1.toggle().ok();

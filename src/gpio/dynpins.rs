@@ -66,8 +66,8 @@ use super::{
 };
 use crate::{
     clock::FilterClkSel,
-    pac::{self, IRQSEL, SYSCONFIG},
-    utility::Funsel,
+    pac::{IRQSEL, SYSCONFIG},
+    utility::{IrqCfg, Funsel},
 };
 use embedded_hal::digital::v2::{InputPin, OutputPin, ToggleableOutputPin};
 use paste::paste;
@@ -344,14 +344,14 @@ impl DynPin {
     pub fn interrupt_edge(
         mut self,
         edge_type: InterruptEdge,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Result<Self, PinError> {
         match self.mode {
             DynPinMode::Input(_) | DynPinMode::Output(_) => {
-                self._irq_enb(syscfg, irqsel, interrupt);
                 self.regs.interrupt_edge(edge_type);
+                self.irq_enb(irq_cfg, syscfg, irqsel);
                 Ok(self)
             }
             _ => Err(PinError::InvalidPinType),
@@ -361,14 +361,14 @@ impl DynPin {
     pub fn interrupt_level(
         mut self,
         level_type: InterruptLevel,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: crate::pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Result<Self, PinError> {
         match self.mode {
             DynPinMode::Input(_) | DynPinMode::Output(_) => {
-                self._irq_enb(syscfg, irqsel, interrupt);
                 self.regs.interrupt_level(level_type);
+                self.irq_enb(irq_cfg, syscfg, irqsel);
                 Ok(self)
             }
             _ => Err(PinError::InvalidPinType),

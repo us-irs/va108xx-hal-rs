@@ -8,18 +8,24 @@ use core::{marker::PhantomData, ops::Deref};
 use libm::floorf;
 
 use crate::clock::enable_peripheral_clock;
+pub use crate::utility::IrqCfg;
 use crate::{
     clock,
     gpio::pins::{
         AltFunc1, AltFunc2, AltFunc3, Pin, PA16, PA17, PA18, PA19, PA2, PA26, PA27, PA3, PA30,
         PA31, PA8, PA9, PB18, PB19, PB20, PB21, PB22, PB23, PB6, PB7, PB8, PB9,
     },
-    pac::{uarta as uart_base, SYSCONFIG, UARTA, UARTB},
+    pac::{uarta as uart_base, IRQSEL, SYSCONFIG, UARTA, UARTB},
+    utility::unmask_irq,
     prelude::*,
     time::{Bps, Hertz},
 };
 
 use embedded_hal::{blocking, serial};
+
+//==================================================================================================
+// Type-Level support
+//==================================================================================================
 
 pub trait Pins<UART> {}
 
@@ -38,12 +44,18 @@ impl Pins<UARTB> for (Pin<PB7, AltFunc1>, Pin<PB6, AltFunc1>) {}
 impl Pins<UARTB> for (Pin<PB19, AltFunc2>, Pin<PB18, AltFunc2>) {}
 impl Pins<UARTB> for (Pin<PB21, AltFunc1>, Pin<PB20, AltFunc1>) {}
 
+//==================================================================================================
+// Regular Definitions
+//==================================================================================================
+
 #[derive(Debug)]
 pub enum Error {
     Overrun,
     FramingError,
     ParityError,
     BreakCondition,
+    TransferPending,
+    BufferTooShort,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -160,12 +172,117 @@ impl From<Bps> for Config {
     }
 }
 
+//==================================================================================================
+// IRQ Definitions
+//==================================================================================================
+
+pub struct IrqInfo {
+    rx_len: usize,
+    rx_idx: usize,
+    irq_cfg: IrqCfg,
+    mode: IrqReceptionMode,
+}
+
+pub enum IrqResultMask {
+    Complete = 0,
+    Overflow = 1,
+    FramingError = 2,
+    ParityError = 3,
+    Break = 4,
+    Timeout = 5,
+    Addr9 = 6,
+}
+pub struct IrqResult {
+    raw_res: u32,
+    pub bytes_read: usize,
+}
+
+impl IrqResult {
+    #[inline]
+    pub fn raw_result(&self) -> u32 {
+        self.raw_res
+    }
+
+    #[inline]
+    pub(crate) fn clear_result(&mut self) {
+        self.raw_res = 0;
+    }
+    #[inline]
+    pub(crate) fn set_result(&mut self, flag: IrqResultMask) {
+        self.raw_res |= 1 << flag as u32;
+    }
+
+    #[inline]
+    pub fn complete(&self) -> bool {
+        if ((self.raw_res >> IrqResultMask::Complete as u32) & 0x01) == 0x00 {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn error(&self) -> bool {
+        if self.overflow_error() || self.framing_error() || self.parity_error() {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn overflow_error(&self) -> bool {
+        if ((self.raw_res >> IrqResultMask::Overflow as u32) & 0x01) == 0x01 {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn framing_error(&self) -> bool {
+        if ((self.raw_res >> IrqResultMask::FramingError as u32) & 0x01) == 0x01 {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn parity_error(&self) -> bool {
+        if ((self.raw_res >> IrqResultMask::ParityError as u32) & 0x01) == 0x01 {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn timeout(&self) -> bool {
+        if ((self.raw_res >> IrqResultMask::Timeout as u32) & 0x01) == 0x01 {
+            return true;
+        }
+        false
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum IrqReceptionMode {
+    Idle,
+    FixedLen,
+    VarLen,
+}
+
+//==================================================================================================
+// UART implementation
+//==================================================================================================
+
 /// Serial abstraction
 pub struct Uart<UART, PINS> {
     uart: UART,
     pins: PINS,
     tx: Tx<UART>,
     rx: Rx<UART>,
+}
+
+pub struct UartWithIrq<UART, PINS> {
+    uart_base: Uart<UART, PINS>,
+    irq_info: IrqInfo,
 }
 
 /// Serial receiver
@@ -247,6 +364,46 @@ where
         self
     }
 
+    #[inline]
+    pub fn enable_rx(&mut self) {
+        self.uart.enable.write(|w| w.rxenable().set_bit());
+    }
+
+    #[inline]
+    pub fn disable_rx(&mut self) {
+        self.uart.enable.write(|w| w.rxenable().set_bit());
+    }
+
+    #[inline]
+    pub fn enable_tx(&mut self) {
+        self.uart.enable.write(|w| w.txenable().set_bit());
+    }
+
+    #[inline]
+    pub fn disable_tx(&mut self) {
+        self.uart.enable.write(|w| w.txenable().set_bit());
+    }
+
+    #[inline]
+    pub fn clear_rx_fifo(&mut self) {
+        self.uart.fifo_clr.write(|w| w.rxfifo().set_bit());
+    }
+
+    #[inline]
+    pub fn clear_tx_fifo(&mut self) {
+        self.uart.fifo_clr.write(|w| w.txfifo().set_bit());
+    }
+
+    #[inline]
+    pub fn clear_rx_status(&mut self) {
+        self.uart.fifo_clr.write(|w| w.rxsts().set_bit());
+    }
+
+    #[inline]
+    pub fn clear_tx_status(&mut self) {
+        self.uart.fifo_clr.write(|w| w.txsts().set_bit());
+    }
+
     pub fn listen(self, event: Event) -> Self {
         self.uart.irq_enb.modify(|_, w| match event {
             Event::RxError => w.irq_rx_status().set_bit(),
@@ -316,6 +473,146 @@ macro_rules! uart_impl {
                 }
             }
         )+
+    }
+}
+
+impl<PINS> Uart<UARTA, PINS> {
+    pub fn into_uart_with_irq(self, irq_cfg: IrqCfg) -> UartWithIrq<UARTA, PINS> {
+        UartWithIrq {
+            uart_base: self,
+            irq_info: IrqInfo {
+                rx_len: 0,
+                rx_idx: 0,
+                irq_cfg,
+                mode: IrqReceptionMode::Idle,
+            },
+        }
+    }
+}
+
+impl<PINS> UartWithIrq<UARTA, PINS> {
+    pub fn read_fixed_len_using_irq(
+        &mut self,
+        max_len: usize,
+        enb_timeout_irq: bool,
+        irqsel: Option<&mut IRQSEL>,
+    ) -> Result<(), Error> {
+        if self.irq_info.mode != IrqReceptionMode::Idle {
+            return Err(Error::TransferPending);
+        }
+        self.irq_info.rx_idx = 0;
+        self.irq_info.rx_len = max_len;
+        self.enable_rx_irq_sources(enb_timeout_irq);
+        if let Some(irqsel) = irqsel {
+            if self.irq_info.irq_cfg.route {
+                irqsel.uart[0].write(|w| unsafe { w.bits(self.irq_info.irq_cfg.irq as u32) });
+            }
+        }
+        if self.irq_info.irq_cfg.enable {
+            unmask_irq(self.irq_info.irq_cfg.irq);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn enable_rx_irq_sources(&mut self, timeout: bool) {
+        self.uart_base.uart.irq_enb.modify(|_, w| {
+            if timeout {
+                w.irq_rx_to().set_bit();
+            }
+            w.irq_rx_status().set_bit();
+            w.irq_rx().set_bit()
+        });
+    }
+
+    #[inline]
+    fn disable_rx_irq_sources(&mut self) {
+        self.uart_base.uart.irq_enb.modify(|_, w| {
+            w.irq_rx_to().clear_bit();
+            w.irq_rx_status().clear_bit();
+            w.irq_rx().clear_bit()
+        });
+    }
+
+    pub fn cancel_transfer(&mut self) {
+        // Disable IRQ
+        cortex_m::peripheral::NVIC::mask(self.irq_info.irq_cfg.irq);
+        self.disable_rx_irq_sources();
+        self.uart_base.clear_tx_fifo();
+        self.irq_info.rx_idx = 0;
+        self.irq_info.rx_len = 0;
+    }
+
+    pub fn irq_handler(&mut self, res: &mut IrqResult, buf: &mut [u8]) -> Result<(), Error> {
+        if buf.len() < self.irq_info.rx_len {
+            return Err(Error::BufferTooShort);
+        }
+
+        let mut rx_status = self.uart_base.uart.rxstatus.read();
+        let _tx_status = self.uart_base.uart.txstatus.read();
+        let irq_end = self.uart_base.uart.irq_end.read();
+
+        let enb_status = self.uart_base.uart.enable.read();
+        let rx_enabled = enb_status.rxenable().bit_is_set();
+        let _tx_enabled = enb_status.txenable().bit_is_set();
+        res.clear_result();
+        if irq_end.irq_rx().bit_is_set() && rx_status.rdavl().bit_is_set() {
+            let mut rd_avl = rx_status.rdavl();
+            // While there is data in the FIFO, write it into the reception buffer
+            while self.irq_info.rx_idx < self.irq_info.rx_len && rd_avl.bit_is_set() {
+                buf[self.irq_info.rx_idx] = nb::block!(self.uart_base.read()).unwrap();
+                rd_avl = self.uart_base.uart.rxstatus.read().rdavl();
+                self.irq_info.rx_idx += 1;
+                if self.irq_info.rx_idx == self.irq_info.rx_len {
+                    self.disable_rx_irq_sources();
+                    res.bytes_read = self.irq_info.rx_len;
+                    res.set_result(IrqResultMask::Complete);
+                    self.irq_info.rx_idx = 0;
+                    self.irq_info.rx_len = 0;
+                    return Ok(());
+                }
+            }
+        }
+
+        // RX transfer not complete, check for RX errors
+        if (self.irq_info.rx_idx < self.irq_info.rx_len) && rx_enabled {
+            // Read status register again, might have changed since reading received data
+            rx_status = self.uart_base.uart.rxstatus.read();
+            if rx_status.rxovr().bit_is_set() {
+                res.set_result(IrqResultMask::Overflow);
+            }
+            if rx_status.rxfrm().bit_is_set() {
+                res.set_result(IrqResultMask::FramingError);
+            }
+            if rx_status.rxpar().bit_is_set() {
+                res.set_result(IrqResultMask::ParityError);
+            }
+            if rx_status.rxbrk().bit_is_set() {
+                res.set_result(IrqResultMask::Break);
+            }
+            if rx_status.rxto().bit_is_set() {
+                // A timeout has occured but there might be some leftover data in the FIFO,
+                // so read that data as well
+                while self.irq_info.rx_idx < self.irq_info.rx_len && rx_status.rdavl().bit_is_set()
+                {
+                    buf[self.irq_info.rx_idx] = nb::block!(self.uart_base.read()).unwrap();
+                    self.irq_info.rx_idx += 1;
+                }
+                res.bytes_read = self.irq_info.rx_idx;
+                res.set_result(IrqResultMask::Timeout);
+                res.set_result(IrqResultMask::Complete);
+            }
+
+            if res.raw_res != 0 {
+                self.disable_rx_irq_sources();
+            }
+        }
+
+        self.uart_base
+            .uart
+            .irq_clr
+            .write(|w| unsafe { w.bits(irq_end.bits()) });
+        Ok(())
     }
 }
 

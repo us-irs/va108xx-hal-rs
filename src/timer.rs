@@ -4,8 +4,10 @@
 //!
 //! - [MS and second tick implementation](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/timer-ticks.rs)
 //! - [Cascade feature example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/cascade.rs)
+pub use crate::utility::IrqCfg;
 use crate::{
     clock::{enable_peripheral_clock, PeripheralClocks},
+    utility::unmask_irq,
     gpio::{
         AltFunc1, AltFunc2, AltFunc3, DynPinId, Pin, PinId, PA0, PA1, PA10, PA11, PA12, PA13, PA14,
         PA15, PA2, PA24, PA25, PA26, PA27, PA28, PA29, PA3, PA30, PA31, PA4, PA5, PA6, PA7, PA8,
@@ -27,7 +29,7 @@ use embedded_hal::{
     blocking::delay,
     timer::{Cancel, CountDown, Periodic},
 };
-use va108xx::{Interrupt, IRQSEL, SYSCONFIG};
+use va108xx::{IRQSEL, SYSCONFIG};
 use void::Void;
 
 const IRQ_DST_NONE: u32 = 0xffffffff;
@@ -386,6 +388,7 @@ unsafe impl TimPinInterface for TimDynRegister {
 pub struct CountDownTimer<TIM: ValidTim> {
     tim: TimRegister<TIM>,
     curr_freq: Hertz,
+    irq_cfg: Option<IrqCfg>,
     sys_clk: Hertz,
     rst_val: u32,
     last_cnt: u32,
@@ -482,6 +485,7 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
         let cd_timer = CountDownTimer {
             tim: unsafe { TimRegister::new(tim) },
             sys_clk: sys_clk.into(),
+            irq_cfg: None,
             rst_val: 0,
             curr_freq: 0.hz(),
             listening: false,
@@ -491,21 +495,28 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
         cd_timer
     }
 
-    /// Listen for events. This also actives the IRQ in the IRQSEL register
-    /// for the provided interrupt. It also actives the peripheral clock for
-    /// IRQSEL
+    /// Listen for events. Depending on the IRQ configuration, this also activates the IRQ in the
+    /// IRQSEL peripheral for the provided interrupt and unmasks the interrupt
     pub fn listen(
         &mut self,
         event: Event,
-        syscfg: &mut SYSCONFIG,
-        irqsel: &mut IRQSEL,
-        interrupt: Interrupt,
+        irq_cfg: IrqCfg,
+        irq_sel: Option<&mut IRQSEL>,
+        sys_cfg: Option<&mut SYSCONFIG>,
     ) {
         match event {
             Event::TimeOut => {
-                enable_peripheral_clock(syscfg, PeripheralClocks::Irqsel);
-                irqsel.tim[TIM::TIM_ID as usize].write(|w| unsafe { w.bits(interrupt as u32) });
-                self.enable_interrupt();
+                cortex_m::peripheral::NVIC::mask(irq_cfg.irq);
+                self.irq_cfg = Some(irq_cfg);
+                if irq_cfg.route {
+                    if let Some(sys_cfg) = sys_cfg {
+                        enable_peripheral_clock(sys_cfg, PeripheralClocks::Irqsel);
+                    }
+                    if let Some(irq_sel) = irq_sel {
+                        irq_sel.tim[TIM::TIM_ID as usize]
+                            .write(|w| unsafe { w.bits(irq_cfg.irq as u32) });
+                    }
+                }
                 self.listening = true;
             }
         }
@@ -554,6 +565,12 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
     #[inline(always)]
     pub fn enable(&mut self) {
         self.tim.reg().ctrl.modify(|_, w| w.enable().set_bit());
+        if let Some(irq_cfg) = self.irq_cfg {
+            self.enable_interrupt();
+            if irq_cfg.enable {
+                unmask_irq(irq_cfg.irq);
+            }
+        }
     }
 
     #[inline(always)]
@@ -720,17 +737,27 @@ impl<TIM: ValidTim> embedded_hal::blocking::delay::DelayMs<u8> for CountDownTime
 
 // Set up a millisecond timer on TIM0. Please note that you still need to unmask the related IRQ
 // and provide an IRQ handler yourself
-pub fn set_up_ms_timer(
-    syscfg: &mut pac::SYSCONFIG,
-    irqsel: &mut pac::IRQSEL,
-    sys_clk: Hertz,
-    tim0: TIM0,
-    irq: pac::Interrupt,
-) -> CountDownTimer<TIM0> {
-    let mut ms_timer = CountDownTimer::new(syscfg, sys_clk, tim0);
-    ms_timer.listen(timer::Event::TimeOut, syscfg, irqsel, irq);
+pub fn set_up_ms_timer<TIM: ValidTim>(
+    irq_cfg: IrqCfg,
+    sys_cfg: &mut pac::SYSCONFIG,
+    irq_sel: Option<&mut pac::IRQSEL>,
+    sys_clk: impl Into<Hertz>,
+    tim0: TIM,
+) -> CountDownTimer<TIM> {
+    let mut ms_timer = CountDownTimer::new(sys_cfg, sys_clk, tim0);
+    ms_timer.listen(timer::Event::TimeOut, irq_cfg, irq_sel, Some(sys_cfg));
     ms_timer.start(1000.hz());
     ms_timer
+}
+
+pub fn set_up_ms_delay_provider<TIM: ValidTim>(
+    sys_cfg: &mut pac::SYSCONFIG,
+    sys_clk: impl Into<Hertz>,
+    tim: TIM,
+) -> CountDownTimer<TIM> {
+    let mut provider = CountDownTimer::new(sys_cfg, sys_clk, tim);
+    provider.start(1000.hz());
+    provider
 }
 
 /// This function can be called in a specified interrupt handler to increment
@@ -763,6 +790,7 @@ impl Delay {
 }
 
 /// This assumes that the user has already set up a MS tick timer in TIM0 as a system tick
+/// with [`set_up_ms_delay_provider`]
 impl embedded_hal::blocking::delay::DelayMs<u32> for Delay {
     fn delay_ms(&mut self, ms: u32) {
         if self.cd_tim.curr_freq() != 1000.hz() || !self.cd_tim.listening() {

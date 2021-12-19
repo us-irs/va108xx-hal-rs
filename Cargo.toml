@@ -45,19 +45,3 @@ opt-level = "s"
 # [profile.release-lto]
 # inherits = "release"
 # lto = true
-
-[[example]]
-name = "timer-ticks"
-required-features = ["rt"]
-
-[[example]]
-name = "tests"
-required-features = ["rt"]
-
-[[example]]
-name = "pwm"
-required-features = ["rt"]
-
-[[example]]
-name = "cascade"
-required-features = ["rt"]

@@ -92,9 +92,10 @@
 use super::dynpins::{DynAlternate, DynGroup, DynInput, DynOutput, DynPinId, DynPinMode};
 use super::reg::RegisterInterface;
 use crate::{
-    pac::{self, IOCONFIG, IRQSEL, PORTA, PORTB, SYSCONFIG},
+    pac::{IOCONFIG, IRQSEL, PORTA, PORTB, SYSCONFIG},
     typelevel::Is,
     Sealed,
+    utility::IrqCfg
 };
 use core::convert::Infallible;
 use core::marker::PhantomData;
@@ -360,6 +361,7 @@ impl<I: PinId, M: PinMode> AnyPin for Pin<I, M> {
 macro_rules! common_reg_if_functions {
     () => {
         paste!(
+
             #[inline]
             pub fn datamask(&self) -> bool {
                 self.regs.datamask()
@@ -397,11 +399,11 @@ macro_rules! common_reg_if_functions {
                 self.regs.write_pin_masked(false)
             }
 
-            fn _irq_enb(
+            fn irq_enb(
                 &mut self,
+                irq_cfg: crate::utility::IrqCfg,
                 syscfg: Option<&mut va108xx::SYSCONFIG>,
-                irqsel: &mut va108xx::IRQSEL,
-                interrupt: va108xx::Interrupt,
+                irqsel: Option<&mut va108xx::IRQSEL>
             ) {
                 if syscfg.is_some() {
                     crate::clock::enable_peripheral_clock(
@@ -410,15 +412,19 @@ macro_rules! common_reg_if_functions {
                     );
                 }
                 self.regs.enable_irq();
-                match self.regs.id().group {
-                    // Set the correct interrupt number in the IRQSEL register
-                    DynGroup::A => {
-                        irqsel.porta[self.regs.id().num as usize]
-                            .write(|w| unsafe { w.bits(interrupt as u32) });
-                    }
-                    DynGroup::B => {
-                        irqsel.portb[self.regs.id().num as usize]
-                            .write(|w| unsafe { w.bits(interrupt as u32) });
+                if let Some(irqsel) = irqsel {
+                    if irq_cfg.route {
+                        match self.regs.id().group {
+                            // Set the correct interrupt number in the IRQSEL register
+                            DynGroup::A => {
+                                irqsel.porta[self.regs.id().num as usize]
+                                    .write(|w| unsafe { w.bits(irq_cfg.irq as u32) });
+                            }
+                            DynGroup::B => {
+                                irqsel.portb[self.regs.id().num as usize]
+                                    .write(|w| unsafe { w.bits(irq_cfg.irq as u32) });
+                            }
+                        }
                     }
                 }
             }
@@ -577,24 +583,24 @@ impl<I: PinId, C: InputConfig> Pin<I, Input<C>> {
     pub fn interrupt_edge(
         mut self,
         edge_type: InterruptEdge,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Self {
-        self._irq_enb(syscfg, irqsel, interrupt);
         self.regs.interrupt_edge(edge_type);
+        self.irq_enb(irq_cfg, syscfg, irqsel);
         self
     }
 
     pub fn interrupt_level(
         mut self,
         level_type: InterruptLevel,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Self {
-        self._irq_enb(syscfg, irqsel, interrupt);
         self.regs.interrupt_level(level_type);
+        self.irq_enb(irq_cfg, syscfg, irqsel);
         self
     }
 }
@@ -622,24 +628,24 @@ impl<I: PinId, C: OutputConfig> Pin<I, Output<C>> {
     pub fn interrupt_edge(
         mut self,
         edge_type: InterruptEdge,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Self {
-        self._irq_enb(syscfg, irqsel, interrupt);
         self.regs.interrupt_edge(edge_type);
+        self.irq_enb(irq_cfg, syscfg, irqsel);
         self
     }
 
     pub fn interrupt_level(
         mut self,
         level_type: InterruptLevel,
+        irq_cfg: IrqCfg,
         syscfg: Option<&mut SYSCONFIG>,
-        irqsel: &mut IRQSEL,
-        interrupt: pac::Interrupt,
+        irqsel: Option<&mut IRQSEL>
     ) -> Self {
-        self._irq_enb(syscfg, irqsel, interrupt);
         self.regs.interrupt_level(level_type);
+        self.irq_enb(irq_cfg, syscfg, irqsel);
         self
     }
 }

@@ -8,10 +8,10 @@ use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
 use va108xx_hal::{
     gpio::PinsA,
-    pac::{self, interrupt},
+    pac,
     prelude::*,
     pwm::{self, get_duty_from_percent, ReducedPwmPin, PWMA, PWMB},
-    timer::{default_ms_irq_handler, set_up_ms_timer, Delay},
+    timer::set_up_ms_delay_provider,
 };
 
 #[entry]
@@ -26,17 +26,7 @@ fn main() -> ! {
         &mut dp.SYSCONFIG,
         10.hz(),
     );
-    let timer = set_up_ms_timer(
-        &mut dp.SYSCONFIG,
-        &mut dp.IRQSEL,
-        50.mhz().into(),
-        dp.TIM0,
-        pac::Interrupt::OC0,
-    );
-    let mut delay = Delay::new(timer);
-    unsafe {
-        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::OC0);
-    }
+    let mut delay = set_up_ms_delay_provider(&mut dp.SYSCONFIG, 50.mhz(), dp.TIM0);
     let mut current_duty_cycle = 0.0;
     PwmPin::set_duty(&mut pwm, get_duty_from_percent(current_duty_cycle));
     PwmPin::enable(&mut pwm);
@@ -46,7 +36,7 @@ fn main() -> ! {
     loop {
         // Increase duty cycle continuously
         while current_duty_cycle < 1.0 {
-            delay.delay_ms(200);
+            delay.delay_ms(200_u16);
             current_duty_cycle += 0.02;
             PwmPin::set_duty(&mut reduced_pin, get_duty_from_percent(current_duty_cycle));
         }
@@ -60,7 +50,7 @@ fn main() -> ! {
         pwmb.set_pwmb_lower_limit(get_duty_from_percent(lower_limit));
         pwmb.set_pwmb_upper_limit(get_duty_from_percent(upper_limit));
         while lower_limit < 0.5 {
-            delay.delay_ms(200);
+            delay.delay_ms(200_u16);
             lower_limit += 0.01;
             upper_limit -= 0.01;
             pwmb.set_pwmb_lower_limit(get_duty_from_percent(lower_limit));
@@ -70,9 +60,4 @@ fn main() -> ! {
         }
         reduced_pin = ReducedPwmPin::<PWMA>::from(pwmb);
     }
-}
-
-#[interrupt]
-fn OC0() {
-    default_ms_irq_handler()
 }
