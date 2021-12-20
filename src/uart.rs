@@ -701,29 +701,27 @@ impl<UART: Instance> UartWithIrqBase<UART> {
         let read_handler =
             |res: &mut IrqResult, read_res: nb::Result<u8, Error>| -> Result<Option<u8>, Error> {
                 match read_res {
-                    Ok(byte) => return Ok(Some(byte)),
-                    Err(nb::Error::WouldBlock) => {
-                        return Ok(None);
-                    }
+                    Ok(byte) => Ok(Some(byte)),
+                    Err(nb::Error::WouldBlock) => Ok(None),
                     Err(nb::Error::Other(e)) => match e {
                         Error::Overrun => {
                             res.set_result(IrqResultMask::Overflow);
-                            return Err(Error::IrqError);
+                            Err(Error::IrqError)
                         }
                         Error::FramingError => {
                             res.set_result(IrqResultMask::FramingError);
-                            return Err(Error::IrqError);
+                            Err(Error::IrqError)
                         }
                         Error::ParityError => {
                             res.set_result(IrqResultMask::ParityError);
-                            return Err(Error::IrqError);
+                            Err(Error::IrqError)
                         }
                         _ => {
                             res.set_result(IrqResultMask::Unknown);
-                            return Err(Error::IrqError);
+                            Err(Error::IrqError)
                         }
                     },
-                };
+                }
             };
         if irq_end.irq_rx().bit_is_set() {
             // If this interrupt bit is set, the trigger level is available at the very least.
@@ -771,13 +769,9 @@ impl<UART: Instance> UartWithIrqBase<UART> {
             if rx_status.rxto().bit_is_set() {
                 // A timeout has occured but there might be some leftover data in the FIFO,
                 // so read that data as well
-                loop {
-                    if let Some(byte) = read_handler(res, self.uart.read())? {
-                        buf[self.irq_info.rx_idx] = byte;
-                        self.irq_info.rx_idx += 1;
-                    } else {
-                        break;
-                    }
+                while let Some(byte) = read_handler(res, self.uart.read())? {
+                    buf[self.irq_info.rx_idx] = byte;
+                    self.irq_info.rx_idx += 1;
                 }
                 self.irq_completion_handler(res);
                 res.set_result(IrqResultMask::Timeout);
