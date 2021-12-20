@@ -3,6 +3,7 @@
 //! Some more information about the recommended scrub rates can be found on the
 //! [Vorago White Paper website](https://www.voragotech.com/resources) in the
 //! application note AN1212
+use crate::pac;
 use va108xx::{IOCONFIG, SYSCONFIG};
 
 #[derive(PartialEq, Debug)]
@@ -39,6 +40,26 @@ pub enum PeripheralSelect {
     Ioconfig = 22,
     Utility = 23,
     Gpio = 24,
+}
+
+/// Generic IRQ config which can be used to specify whether the HAL driver will
+/// use the IRQSEL register to route an interrupt, and whether the IRQ will be unmasked in the
+/// Cortex-M0 NVIC. Both are generally necessary for IRQs to work, but the user might perform
+/// this steps themselves
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct IrqCfg {
+    /// Interrupt target vector. Should always be set, might be required for disabling IRQs
+    pub irq: pac::Interrupt,
+    /// Specfiy whether IRQ should be routed to an IRQ vector using the IRQSEL peripheral
+    pub route: bool,
+    /// Specify whether the IRQ is unmasked in the Cortex-M NVIC
+    pub enable: bool,
+}
+
+impl IrqCfg {
+    pub fn new(irq: pac::Interrupt, route: bool, enable: bool) -> Self {
+        IrqCfg { irq, route, enable }
+    }
 }
 
 /// Enable scrubbing for the ROM
@@ -110,4 +131,14 @@ pub fn port_mux(
             Ok(())
         }
     }
+}
+
+/// Unmask and enable an IRQ with the given interrupt number
+///
+/// ## Safety
+///
+/// The unmask function can break mask-based critical sections
+#[inline]
+pub(crate) fn unmask_irq(irq: pac::Interrupt) {
+    unsafe { cortex_m::peripheral::NVIC::unmask(irq) };
 }

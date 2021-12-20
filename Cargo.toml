@@ -1,6 +1,6 @@
 [package]
 name = "va108xx-hal"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["Robin Mueller <muellerr@irs.uni-stuttgart.de>"]
 edition = "2021"
 description = "HAL for the Vorago VA108xx family of microcontrollers"
@@ -27,6 +27,7 @@ version = "0.2.4"
 rt = ["va108xx/rt"]
 
 [dev-dependencies]
+cortex-m-rtic = "0.6.0-rc.4"
 panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 panic-halt = "0.2"
@@ -55,9 +56,9 @@ name = "tests"
 required-features = ["rt"]
 
 [[example]]
-name = "pwm"
+name = "cascade"
 required-features = ["rt"]
 
 [[example]]
-name = "cascade"
+name = "uart-irq-rtic"
 required-features = ["rt"]

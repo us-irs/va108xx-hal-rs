@@ -6,7 +6,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [unreleased]
+## [v0.5.0]
+
+### Added
+
+- Reactored IRQ handling, so that `unmask` operations can be moved to HAL
+- Added UART IRQ handler. Right now, can only perform reception, TX still needs to be done in
+  a blocking manner
+- Added RTIC template and RTIC UART IRQ application
+
+### Fixed
+
+- Bugfix in UART code where RX and TX could not be enabled or disabled independently
 
 ## [v0.4.3]
 

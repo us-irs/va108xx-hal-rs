@@ -14,8 +14,8 @@ use va108xx_hal::{
     pac::{self, interrupt, TIM4, TIM5},
     prelude::*,
     timer::{
-        default_ms_irq_handler, set_up_ms_timer, CascadeCtrl, CascadeSource, CountDownTimer, Delay,
-        Event,
+        default_ms_irq_handler, set_up_ms_delay_provider, CascadeCtrl, CascadeSource,
+        CountDownTimer, Event, IrqCfg,
     },
 };
 
@@ -28,23 +28,16 @@ fn main() -> ! {
     rprintln!("-- VA108xx Cascade example application--");
 
     let mut dp = pac::Peripherals::take().unwrap();
-    let timer = set_up_ms_timer(
-        &mut dp.SYSCONFIG,
-        &mut dp.IRQSEL,
-        50.mhz().into(),
-        dp.TIM0,
-        pac::Interrupt::OC0,
-    );
-    let mut delay = Delay::new(timer);
+    let mut delay = set_up_ms_delay_provider(&mut dp.SYSCONFIG, 50.mhz(), dp.TIM0);
 
     // Will be started periodically to trigger a cascade
     let mut cascade_triggerer =
         CountDownTimer::new(&mut dp.SYSCONFIG, 50.mhz(), dp.TIM3).auto_disable(true);
     cascade_triggerer.listen(
         Event::TimeOut,
-        &mut dp.SYSCONFIG,
-        &mut dp.IRQSEL,
-        va108xx::Interrupt::OC1,
+        IrqCfg::new(va108xx::Interrupt::OC1, true, false),
+        Some(&mut dp.IRQSEL),
+        Some(&mut dp.SYSCONFIG),
     );
 
     // First target for cascade
@@ -63,9 +56,9 @@ fn main() -> ! {
     // the timer expires
     cascade_target_1.listen(
         Event::TimeOut,
-        &mut dp.SYSCONFIG,
-        &mut dp.IRQSEL,
-        va108xx::Interrupt::OC2,
+        IrqCfg::new(va108xx::Interrupt::OC2, true, false),
+        Some(&mut dp.IRQSEL),
+        Some(&mut dp.SYSCONFIG),
     );
     // The counter will only activate when the cascade signal is coming in so
     // it is okay to call start here to set the reset value
@@ -89,9 +82,9 @@ fn main() -> ! {
     // the timer expires
     cascade_target_2.listen(
         Event::TimeOut,
-        &mut dp.SYSCONFIG,
-        &mut dp.IRQSEL,
-        va108xx::Interrupt::OC3,
+        IrqCfg::new(va108xx::Interrupt::OC3, true, false),
+        Some(&mut dp.IRQSEL),
+        Some(&mut dp.SYSCONFIG),
     );
     // The counter will only activate when the cascade signal is coming in so
     // it is okay to call start here to set the reset value
@@ -112,7 +105,7 @@ fn main() -> ! {
     loop {
         rprintln!("-- Triggering cascade in 0.5 seconds --");
         cascade_triggerer.start(2.hz());
-        delay.delay_ms(5000);
+        delay.delay_ms(5000_u16);
     }
 }
 
