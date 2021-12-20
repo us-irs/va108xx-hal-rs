@@ -2,7 +2,8 @@
 //!
 //! ## Examples
 //!
-//! - [UART example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/uart.rs)
+//! - [UART simple example](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/uart.rs)
+//! - [UART with IRQ and RTIC](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/examples/uart-irq-rtic.rs)
 use core::{convert::Infallible, ptr};
 use core::{marker::PhantomData, ops::Deref};
 use libm::floorf;
