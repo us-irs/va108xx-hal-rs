@@ -1,5 +1,12 @@
-//! UART example application. Sends a test string over a UART and then enters
-//! echo mode
+//! More complex UART application
+//!
+//! Uses the IRQ capabilities of the VA10820 peripheral and the RTIC framework to poll the UART in
+//! a non-blocking way. You can send variably sized strings to the VA10820 which will be echoed
+//! back to the sender.
+//!
+//! This script was tested with an Arduino Due. You can find the test script in the
+//! [`/test/DueSerialTest`](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/test/DueSerialTest)
+//! folder,
 #![no_main]
 #![no_std]
 
