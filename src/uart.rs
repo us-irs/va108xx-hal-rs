@@ -178,7 +178,7 @@ impl From<Bps> for Config {
 // IRQ Definitions
 //==================================================================================================
 
-pub struct IrqInfo {
+struct IrqInfo {
     rx_len: usize,
     rx_idx: usize,
     irq_cfg: IrqCfg,
@@ -197,6 +197,7 @@ pub enum IrqResultMask {
     Unknown = 7,
 }
 
+/// This struct is used to return the default IRQ handler result to the user
 #[derive(Debug, Default)]
 pub struct IrqResult {
     raw_res: u32,
@@ -277,32 +278,36 @@ impl IrqResult {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum IrqReceptionMode {
+enum IrqReceptionMode {
     Idle,
-    FixedLen,
-    VarLen,
+    Pending
 }
 
 //==================================================================================================
 // UART implementation
 //==================================================================================================
 
+/// Type erased variant of a UART. Can be created with the [`Uart::downgrade`] function.
 pub struct UartBase<UART> {
     uart: UART,
     tx: Tx<UART>,
     rx: Rx<UART>,
 }
-/// Serial abstraction
+/// Serial abstraction. Entry point to create a new UART
 pub struct Uart<UART, PINS> {
     uart_base: UartBase<UART>,
     pins: PINS,
 }
 
+/// UART using the IRQ capabilities of the peripheral. Can be created with the
+/// [`Uart::into_uart_with_irq`] function.
 pub struct UartWithIrq<UART, PINS> {
     irq_base: UartWithIrqBase<UART>,
     pins: PINS,
 }
 
+/// Type-erased UART using the IRQ capabilities of the peripheral. Can be created with the
+/// [`UartWithIrq::downgrade`] function.
 pub struct UartWithIrqBase<UART> {
     pub uart: UartBase<UART>,
     irq_info: IrqInfo,
@@ -478,6 +483,8 @@ where
         self
     }
 
+    /// If the IRQ capabilities of the peripheral are used, the UART needs to be converted
+    /// with this function
     pub fn into_uart_with_irq(
         self,
         irq_cfg: IrqCfg,
@@ -632,6 +639,14 @@ impl<UART: Instance> UartWithIrqBase<UART> {
         self
     }
 
+    /// This initializes a non-blocking read transfer using the IRQ capabilities of the UART
+    /// peripheral.
+    ///
+    /// The only required information is the maximum length for variable sized reception
+    /// or the expected length for fixed length reception. If variable sized packets are expected,
+    /// the timeout functionality of the IRQ should be enabled as well. After calling this function,
+    /// the [`irq_handler`](Self::irq_handler) function should be called in the user interrupt
+    /// handler to read the received packets and reinitiate another transfer if desired.
     pub fn read_fixed_len_using_irq(
         &mut self,
         max_len: usize,
@@ -640,6 +655,7 @@ impl<UART: Instance> UartWithIrqBase<UART> {
         if self.irq_info.mode != IrqReceptionMode::Idle {
             return Err(Error::TransferPending);
         }
+        self.irq_info.mode = IrqReceptionMode::Pending;
         self.irq_info.rx_idx = 0;
         self.irq_info.rx_len = max_len;
         self.uart.enable_rx();
@@ -690,6 +706,10 @@ impl<UART: Instance> UartWithIrqBase<UART> {
         self.irq_info.rx_len = 0;
     }
 
+    /// Default IRQ handler which can be used to read the packets arriving on the UART peripheral.
+    ///
+    /// If passed buffer is equal to or larger than the specified maximum length, an
+    /// [`Error::BufferTooShort`] will be returned
     pub fn irq_handler(&mut self, res: &mut IrqResult, buf: &mut [u8]) -> Result<(), Error> {
         if buf.len() < self.irq_info.rx_len {
             return Err(Error::BufferTooShort);
@@ -800,6 +820,7 @@ impl<UART: Instance> UartWithIrqBase<UART> {
         res.bytes_read = self.irq_info.rx_idx;
         res.clear_result();
         res.set_result(IrqResultMask::Complete);
+        self.irq_info.mode = IrqReceptionMode::Idle;
         self.irq_info.rx_idx = 0;
         self.irq_info.rx_len = 0;
     }
@@ -810,6 +831,7 @@ impl<UART: Instance> UartWithIrqBase<UART> {
 }
 
 impl<UART: Instance, PINS> UartWithIrq<UART, PINS> {
+    /// See [`UartWithIrqBase::read_fixed_len_using_irq`] doc
     pub fn read_fixed_len_using_irq(
         &mut self,
         max_len: usize,
@@ -823,6 +845,7 @@ impl<UART: Instance, PINS> UartWithIrq<UART, PINS> {
         self.irq_base.cancel_transfer()
     }
 
+    /// See [`UartWithIrqBase::irq_handler`] doc
     pub fn irq_handler(&mut self, res: &mut IrqResult, buf: &mut [u8]) -> Result<(), Error> {
         self.irq_base.irq_handler(res, buf)
     }

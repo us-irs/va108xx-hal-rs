@@ -6,7 +6,7 @@
 //!
 //! This script was tested with an Arduino Due. You can find the test script in the
 //! [`/test/DueSerialTest`](https://egit.irs.uni-stuttgart.de/rust/va108xx-hal/src/branch/main/test/DueSerialTest)
-//! folder,
+//! folder.
 #![no_main]
 #![no_std]
 
