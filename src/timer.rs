@@ -21,7 +21,7 @@ use crate::{
     private::Sealed,
     time::Hertz,
     timer,
-    utility::unmask_irq,
+    utility::{mask_irq, unmask_irq},
 };
 use core::cell::Cell;
 use cortex_m::interrupt::Mutex;
@@ -576,6 +576,12 @@ impl<TIM: ValidTim> CountDownTimer<TIM> {
     #[inline(always)]
     pub fn disable(&mut self) {
         self.tim.reg().ctrl.modify(|_, w| w.enable().clear_bit());
+        if let Some(irq_cfg) = self.irq_cfg {
+            self.disable_interrupt();
+            if irq_cfg.enable {
+                mask_irq(irq_cfg.irq);
+            }
+        }
     }
 
     /// Disable the counter, setting both enable and active bit to 0
@@ -742,9 +748,9 @@ pub fn set_up_ms_timer<TIM: ValidTim>(
     sys_cfg: &mut pac::SYSCONFIG,
     irq_sel: Option<&mut pac::IRQSEL>,
     sys_clk: impl Into<Hertz>,
-    tim0: TIM,
+    tim: TIM,
 ) -> CountDownTimer<TIM> {
-    let mut ms_timer = CountDownTimer::new(sys_cfg, sys_clk, tim0);
+    let mut ms_timer = CountDownTimer::new(sys_cfg, sys_clk, tim);
     ms_timer.listen(timer::Event::TimeOut, irq_cfg, irq_sel, Some(sys_cfg));
     ms_timer.start(1000.hz());
     ms_timer

@@ -142,3 +142,8 @@ pub fn port_mux(
 pub(crate) fn unmask_irq(irq: pac::Interrupt) {
     unsafe { cortex_m::peripheral::NVIC::unmask(irq) };
 }
+
+#[inline]
+pub(crate) fn mask_irq(irq: pac::Interrupt) {
+    cortex_m::peripheral::NVIC::mask(irq);
+}
