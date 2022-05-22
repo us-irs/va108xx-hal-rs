@@ -280,7 +280,7 @@ impl IrqResult {
 #[derive(Debug, PartialEq)]
 enum IrqReceptionMode {
     Idle,
-    Pending
+    Pending,
 }
 
 //==================================================================================================
