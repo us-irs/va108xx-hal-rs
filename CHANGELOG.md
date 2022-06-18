@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v0.5.1]
+
+### Changes
+
+- Updated dependencies:
+  - `cortex-m-rtic` (dev-depencency) to 1.1.2
+  - `once_cell` to 1.12.0
+  - Other depencies: Only revision has changed
+
 ## [v0.5.0]
 
 ### Added
