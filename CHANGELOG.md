@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Updated dependencies:
   - `cortex-m-rtic` (dev-depencency) to 1.1.2
   - `once_cell` to 1.12.0
-  - Other depencies: Only revision has changed
+  - Other dependencies: Only revision has changed
 
 ## [v0.5.0]
 
