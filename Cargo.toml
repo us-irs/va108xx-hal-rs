@@ -8,26 +8,33 @@ homepage = "https://egit.irs.uni-stuttgart.de/rust/va108xx-hal"
 repository = "https://egit.irs.uni-stuttgart.de/rust/va108xx-hal"
 license = "Apache-2.0"
 keywords = ["no-std", "hal", "cortex-m", "vorago", "va108xx"]
-categories = ["embedded", "no-std", "hardware-support"]
+categories = ["aerospace", "embedded", "no-std", "hardware-support"]
 
 [dependencies]
+va108xx = "0.2.4"
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 nb = "1"
 paste = "1.0"
-embedded-hal = { features = ["unproven"], version = "0.2.6" }
-void = { version = "1.0", default-features = false }
-once_cell = { version = "1.8.0", default-features = false }
-libm = "0.2.1"
+libm = "0.2.2"
 
-[dependencies.va108xx]
-version = "0.2.4"
+[dependencies.embedded-hal]
+version = "0.2.7"
+features = ["unproven"]
+
+[dependencies.void]
+version = "1.0"
+default-features = false
+
+[dependencies.once_cell]
+version = "1.12.0"
+default-features = false
 
 [features]
 rt = ["va108xx/rt"]
 
 [dev-dependencies]
-cortex-m-rtic = "0.6.0-rc.4"
+cortex-m-rtic = "1.1.2"
 panic-rtt-target = { version = "0.1", features = ["cortex-m"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 panic-halt = "0.2"
