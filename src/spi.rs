@@ -25,7 +25,7 @@ use embedded_hal::{
 // Defintions
 //==================================================================================================
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum HwChipSelectId {
     Id0 = 0,
     Id1 = 1,
@@ -38,7 +38,7 @@ pub enum HwChipSelectId {
     Invalid = 0xff,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum WordSize {
     OneBit = 0x00,
     FourBits = 0x03,

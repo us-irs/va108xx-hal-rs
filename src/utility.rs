@@ -6,7 +6,7 @@
 use crate::pac;
 use va108xx::{IOCONFIG, SYSCONFIG};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum UtilityError {
     InvalidCounterResetVal,
     InvalidPin,
@@ -19,13 +19,13 @@ pub enum Funsel {
     Funsel3 = 0b11,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PortSel {
     PortA,
     PortB,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PeripheralSelect {
     PortA = 0,
     PortB = 1,
@@ -46,7 +46,7 @@ pub enum PeripheralSelect {
 /// use the IRQSEL register to route an interrupt, and whether the IRQ will be unmasked in the
 /// Cortex-M0 NVIC. Both are generally necessary for IRQs to work, but the user might perform
 /// this steps themselves
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct IrqCfg {
     /// Interrupt target vector. Should always be set, might be required for disabling IRQs
     pub irq: pac::Interrupt,

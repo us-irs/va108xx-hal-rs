@@ -143,7 +143,7 @@ pub const DYN_ALT_FUNC_3: DynPinMode = DynPinMode::Alternate(DynAlternate::Funse
 //==================================================================================================
 
 /// Value-level `enum` for pin groups
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DynGroup {
     A,
     B,

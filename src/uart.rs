@@ -60,7 +60,7 @@ pub enum Error {
     IrqError,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Event {
     // Receiver FIFO interrupt enable. Generates interrupt
     // when FIFO is at least half full. Half full is defined as FIFO
@@ -84,20 +84,20 @@ pub enum Event {
     TxCts,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Parity {
     None,
     Odd,
     Even,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum StopBits {
     One = 0,
     Two = 1,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum WordSize {
     Five = 0,
     Six = 1,

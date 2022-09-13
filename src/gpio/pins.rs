@@ -106,27 +106,27 @@ use paste::paste;
 //  Errors and Definitions
 //==================================================================================================
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InterruptEdge {
     HighToLow,
     LowToHigh,
     BothEdges,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InterruptLevel {
     Low = 0,
     High = 1,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PinState {
     Low = 0,
     High = 1,
 }
 
 /// GPIO error type
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PinError {
     /// The pin did not have the correct ID or mode for the requested operation.
     /// [`DynPin`](crate::gpio::DynPin)s are not tracked and verified at compile-time, so run-time
@@ -182,7 +182,7 @@ pub struct Input<C: InputConfig> {
 
 impl<C: InputConfig> Sealed for Input<C> {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum FilterType {
     SystemClock = 0,
     DirectInputWithSynchronization = 1,

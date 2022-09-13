@@ -45,7 +45,7 @@ pub enum Event {
     TimeOut,
 }
 
-#[derive(Default, Debug, PartialEq, Copy, Clone)]
+#[derive(Default, Debug, PartialEq, Eq, Copy, Clone)]
 pub struct CascadeCtrl {
     /// Enable Cascade 0 signal active as a requirement for counting
     pub enb_start_src_csd0: bool,
@@ -74,7 +74,7 @@ pub struct CascadeCtrl {
     pub trg_csd2: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CascadeSel {
     Csd0 = 0,
     Csd1 = 1,
@@ -82,7 +82,7 @@ pub enum CascadeSel {
 }
 
 /// The numbers are the base numbers for bundles like PORTA, PORTB or TIM
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CascadeSource {
     PortABase = 0,
     PortBBase = 32,
@@ -95,7 +95,7 @@ pub enum CascadeSource {
     ClockDividerBase = 120,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TimerErrors {
     Canceled,
     /// Invalid input for Cascade source

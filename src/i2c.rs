@@ -18,13 +18,13 @@ pub use embedded_hal::blocking::i2c::{SevenBitAddress, TenBitAddress};
 // Defintions
 //==================================================================================================
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum FifoEmptyMode {
     Stall = 0,
     EndTransaction = 1,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     InvalidTimingParams,
     ArbitrationLost,
@@ -46,19 +46,19 @@ enum I2cCmd {
     Cancel = 0b100,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum I2cSpeed {
     Regular100khz = 0,
     Fast400khz = 1,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum I2cDirection {
     Send = 0,
     Read = 1,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum I2cAddress {
     Regular(u8),
     TenBit(u16),

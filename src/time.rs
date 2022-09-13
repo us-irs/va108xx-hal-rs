@@ -6,7 +6,7 @@
 //! allowing it to be converted into frequencies.
 
 /// Bits per second
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
 pub struct Bps(pub u32);
 
 /// Hertz
@@ -25,7 +25,7 @@ pub struct Bps(pub u32);
 ///
 /// let freq = 60.hz();
 /// ```
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
 pub struct Hertz(pub u32);
 
 /// Kilohertz
@@ -47,7 +47,7 @@ pub struct Hertz(pub u32);
 ///
 /// let freq = 100.khz();
 /// ```
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
 pub struct KiloHertz(pub u32);
 
 /// Megahertz
@@ -68,14 +68,14 @@ pub struct KiloHertz(pub u32);
 ///
 /// let freq = 8.mhz();
 /// ```
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
 pub struct MegaHertz(pub u32);
 
 /// Time unit
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Clone, Copy)]
 pub struct MilliSeconds(pub u32);
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Clone, Copy)]
 pub struct MicroSeconds(pub u32);
 
 /// Extension trait that adds convenience methods to the `u32` type
