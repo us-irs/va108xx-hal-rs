@@ -150,7 +150,7 @@ pub enum DynGroup {
 }
 
 /// Value-level `struct` representing pin IDs
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct DynPinId {
     pub group: DynGroup,
     pub num: u8,
