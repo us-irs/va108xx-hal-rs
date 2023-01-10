@@ -7,5 +7,6 @@ RUN apt-get --yes upgrade
 # tzdata is a dependency, won't install otherwise
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN rustup target add thumbv6m-none-eabi && \
+RUN rustup install nightly && \
+	rustup target add thumbv6m-none-eabi && \
 	rustup component add rustfmt clippy

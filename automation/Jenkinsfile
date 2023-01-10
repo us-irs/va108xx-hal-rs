@@ -1,47 +1,34 @@
 pipeline {
-    agent any
+    agent {
+        dockerfile {
+            dir 'automation'
+            reuseNode true
+        }
+    }
+
 
     stages {
         stage('Clippy') {
-            agent {
-                dockerfile {
-                    dir 'automation'
-                    reuseNode true
-                }
-            }
             steps {
                 sh 'cargo clippy'
             }
         }
         stage('Rustfmt') {
-            agent {
-                dockerfile {
-                    dir 'automation'
-                    reuseNode true
-                }
-            }
             steps {
                 sh 'cargo fmt'
             }
         }
-        stage('Check') {
-            agent {
-                dockerfile {
-                    dir 'automation'
-                    reuseNode true
-                }
+        stage('Docs') {
+            steps {
+                sh 'cargo +nightly doc'
             }
+        }
+        stage('Check') {
             steps {
                 sh 'cargo check --target thumbv6m-none-eabi'
             }
         }
         stage('Check Examples') {
-            agent {
-                dockerfile {
-                    dir 'automation'
-                    reuseNode true
-                }
-            }
             steps {
                 sh 'cargo check --target thumbv6m-none-eabi --examples'
             }
