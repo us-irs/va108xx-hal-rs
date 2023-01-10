@@ -119,14 +119,14 @@ impl TimingCfg {
     }
 
     pub fn reg(&self) -> u32 {
-        ((self.tbuf as u32) << 28
+        (self.tbuf as u32) << 28
             | (self.thd_sta as u32) << 24
             | (self.tsu_sta as u32) << 20
             | (self.tsu_sto as u32) << 16
             | (self.tlow as u32) << 12
             | (self.thigh as u32) << 8
             | (self.tf as u32) << 4
-            | (self.tr as u32)) as u32
+            | (self.tr as u32)
     }
 }
 

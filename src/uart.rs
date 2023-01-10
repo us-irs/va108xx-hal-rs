@@ -354,7 +354,7 @@ impl<UART: Instance> UartBase<UART> {
         };
         let x = sys_clk.0 as f32 / (config.baudrate.0 * baud_multiplier) as f32;
         let integer_part = floorf(x) as u32;
-        let frac = floorf((64.0 * (x - integer_part as f32) + 0.5) as f32) as u32;
+        let frac = floorf(64.0 * (x - integer_part as f32) + 0.5) as u32;
         self.uart
             .clkscale
             .write(|w| unsafe { w.bits(integer_part * 64 + frac) });
