@@ -63,7 +63,7 @@ is contained within the
 
 1. Set up your Rust cross-compiler if you have not done so yet. See more in the [build chapter](#Building)
 2. Create a new binary crate with `cargo init`
-3. To ensure that `cargo build` cross-compiles, it is recommended to create a `cargo/config.toml`
+3. To ensure that `cargo build` cross-compiles, it is recommended to create a `.cargo/config.toml`
    file. A sample `.cargo/config.toml` file is provided in this repository as well
 4. Copy the `memory.x` file into your project. This file contains information required by the linker.
 5. Copy the `blinky.rs` file to the `src/main.rs` file in your binary crate

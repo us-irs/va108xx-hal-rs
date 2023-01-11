@@ -9,4 +9,5 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN rustup install nightly && \
 	rustup target add thumbv6m-none-eabi && \
+	rustup +nightly target add thumbv6m-none-eabi && \
 	rustup component add rustfmt clippy
