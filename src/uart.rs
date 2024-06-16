@@ -900,11 +900,10 @@ impl<UART: Instance> serial::Write<u8> for Tx<UART> {
             return Err(nb::Error::WouldBlock);
         } else {
             // DPARITY bit not supported yet
+            // NOTE(unsafe) atomic write to data register
             unsafe {
                 // NOTE(unsafe) atomic write to data register
-                // NOTE(write_volatile) 8-bit write that's not
-                // possible through the svd2rust API
-                ptr::write_volatile(&(*UART::ptr()).data as *const _ as *mut _, word);
+                (*UART::ptr()).data.write(|w| w.bits(word as u32));
             }
         }
         Ok(())
